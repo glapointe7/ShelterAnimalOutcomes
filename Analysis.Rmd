@@ -1,0 +1,596 @@
+---
+title: "Shelter Animal Outcomes"
+author: "Gabriel Lapointe"
+date: "May 13, 2016"
+output: html_document
+---
+
+# 1 Introduction
+Every year, approximately 7.6 million companion animals end up in US shelters. Many animals are given up as unwanted by their owners, while others are picked up after getting lost or taken out of cruelty situations. Many of these animals find forever families to take them home, but just as many are not so lucky. 2.7 million dogs and cats are euthanized in the US every year.
+
+
+## 1.1 Objective
+The objective is to help improving outcomes for shelter animals. Using a dataset of intake information including breed, color, sex, and age from the Austin Animal Center, we have to predict the outcome for each animal.
+
+To support our analysis, we are given the train and test sets in CSV files.
+
+
+## 1.2 Data Integrity
+The data comes from [Austin Animal Center](http://www.austintexas.gov/department/animal-services) from October 1st, 2013 to March, 2016. Outcomes represent the status of animals as they leave the Animal Center. All animals receive a unique Animal ID during intake. Source of the competition: https://www.kaggle.com/c/shelter-animal-outcomes
+
+
+## 1.3 Evaluation Metrics
+Since we have 5 outcome types where we need to calculate a prediction's probability for each class (outcome type), we have to manage 5 classes using a multi-class algorithm. The `Log Loss` function quantifies the accuracy of a classifier by penalising false classifications. Minimising the `Log Loss` function is basically equivalent to maximising the accuracy of the classifier which is what we need.
+
+Thus, Kaggle provides us the evaluation metric we need:
+$$LogLoss = -\frac{1}{N} \sum_{i = 0}^N \sum_{j = 0}^M y_{ij} \log{\mathbb{P}_{ij}}$$
+where 
+    $N$ is the total number of animals, 
+    $M$ is the number of outcomes, 
+    $y_{ij}$ is 1 if observation $i$ is in outcome $j$ and 0 otherwise,
+    $\mathbb{P}_{ij}$ is the predicted probability that observation $i$ belongs to outcome $j$.
+
+
+## 1.4 Dataset Questions
+Before we start the predictive analysis, we need to write a list of questions about this dataset considering what we have to predict. 
+
+* What is the proportion of animals for each outcome?
+* Are there features that can be split in many other features? If yes, are they improving the score? Why and how?
+* For each outcome, what features have the most importance and why?
+
+
+## 1.5 Questions that People can ask
+
+* Does the animal have a name?
+* Is the animal intact or spayed/neutered?
+* Is the animal a male or female?
+* How big is the animal?
+* How old the animal is?
+* Is the animal aggressive?
+* How is the hair type of the animal? 
+* Does the animal have any disease?
+* Why is the owner got rid of the animal (if the animal belongs to a owner before)?
+
+
+# 2 Exploration and Visualization
+In this section, we explore the dataset and we test hypotheses on features. The objective is to visualize and compare changes we will make to this dataset to validate if they have significant influance on the outcomes or not.
+
+We load the test and train datasets, and set the seed. All blank and space values are replaced by the value `0`.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+source("Utilities.R")
+
+train <- read.csv("train.csv", header = TRUE, na.strings = c("", " "), stringsAsFactors = FALSE)
+test <- read.csv("test.csv", header = TRUE, na.strings = c("", " "), stringsAsFactors = FALSE)
+train[is.na(train)] <- 0
+test[is.na(test)] <- 0
+set.seed(1234)
+```
+
+
+### 2.1 Convert AgeuponOutcome Values to Days
+We transform the feature `AgeuponOutcome` to integer values. The age will be counted in days. For example, `2 year` will be replaced by the value 2 * 365 = 730. For months, the formula will be `age * 30`. For weeks, the formula will be `age * 7`. Finally, for years, the formula will be `age * 365`.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+## Get the list of integer extracted from the feature AgeuponOutcome.
+train.age <- as.integer(regmatches(train$AgeuponOutcome, regexpr("[[:digit:]]+", train$AgeuponOutcome)))
+test.age <- as.integer(regmatches(test$AgeuponOutcome, regexpr("[[:digit:]]+", test$AgeuponOutcome)))
+
+## Get row index list where AgeuponOutcome contains "year", "month", "week" or "day".
+## Get the correspondant integer from each row index and apply the formula to get all ages in years.
+train.year.list <- grep("year", train$AgeuponOutcome)
+train$AgeuponOutcome[train.year.list] <- train.age[train.year.list] * 365
+train.month.list <- grep("month", train$AgeuponOutcome)
+train$AgeuponOutcome[train.month.list] <- train.age[train.month.list] * 30
+train.week.list <- grep("week", train$AgeuponOutcome)
+train$AgeuponOutcome[train.week.list] <- train.age[train.week.list] * 7
+train.day.list <- grep("day", train$AgeuponOutcome)
+train$AgeuponOutcome[train.day.list] <- train.age[train.day.list]
+
+test.year.list <- grep("year", test$AgeuponOutcome)
+test$AgeuponOutcome[test.year.list] <- test.age[test.year.list] * 365
+test.month.list <- grep("month", test$AgeuponOutcome)
+test$AgeuponOutcome[test.month.list] <- test.age[test.month.list] * 30
+test.week.list <- grep("week", test$AgeuponOutcome)
+test$AgeuponOutcome[test.week.list] <- test.age[test.week.list] * 7
+test.day.list <- grep("day", test$AgeuponOutcome)
+test$AgeuponOutcome[test.day.list] <- test.age[test.day.list]
+
+train$AgeuponOutcome <- as.integer(train$AgeuponOutcome)
+test$AgeuponOutcome <- as.integer(test$AgeuponOutcome)
+
+print(summary(train$AgeuponOutcome))
+```
+
+
+## 2.2 Outcomes Visualization
+The objective is to answer the question: `What is the proportion of animals for each outcome?`. Let's visualize how the outcomes are split in the train set with the following histogram.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+ggplot(train, aes(OutcomeType)) +
+        geom_bar(aes(y = ..count.. / sum(..count..))) +
+        scale_y_continuous(labels = percent) +
+        geom_text(aes(y = ..count.. / sum(..count..), label = scales::percent((..count..) / sum(..count..))), stat = "count", vjust = -0.25) +
+        labs(title = "Percentage of each outcomes in the train set", y = "Percent", x = "Outcome Types")
+```
+
+
+### 2.3 Named vs No Named Animals
+The feature `Name` is transformed to a boolean value where the value is 0 when the animal has no name, and 1 otherwise. Logically, the name of an animal should not have any impact on the outcomes. But knowing that an animal has no name versus has a name may influance the outcomes. 
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train$Name[train$Name != 0] <- 1
+test$Name[test$Name != 0] <- 1
+
+train$NameLength <- ifelse(train$Name == 0, 0, str_length(train$Name))
+test$NameLength <- ifelse(test$Name == 0, 0, str_length(test$Name))
+```
+
+Let's take a look on the plot if this has a signifiant influance on the outcomes.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.named <- ddply(train, .(Name), summarise,
+                     proportion = as.numeric(prop.table(table(OutcomeType))),
+                     OutcomeType = names(table(OutcomeType)))
+print(train.named)
+ggplot(train.named, aes(OutcomeType, proportion, fill = Name)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_y_continuous(labels = percent) +
+        labs(title = "Outcome Percent by Animals Named vs. Not Named", y = "Percent", x = "Outcome Types Not Named vs Named")
+```
+
+Named animals are mostly adopted since no named animals are transfered from the above histogram. The feature telling if an animal has a name or not influances clearly the outcomes.
+
+
+## 2.4 Impact of Age on Outcomes
+We state that most important outcome will be different from a younger to an older animal. We define 'younger' animals all animals that are 1 month or younger, and 'older' animals being 1 year old and older.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.copy <- train
+train.copy$AgeuponOutcome[train$AgeuponOutcome <= 30] <- "1 month and younger"
+train.copy$AgeuponOutcome[train$AgeuponOutcome > 30 & train$AgeuponOutcome < 365] <- "Between 1 month and 1 year"
+train.copy$AgeuponOutcome[train$AgeuponOutcome >= 365] <- "1 year and older"
+
+train.age <- ddply(train.copy, .(AgeuponOutcome), summarise,
+                   proportion = as.numeric(prop.table(table(OutcomeType))),
+                   OutcomeType = names(table(OutcomeType)))
+print(train.age)
+ggplot(train.age, aes(OutcomeType, proportion, fill = AgeuponOutcome)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_y_continuous(labels = percent) +
+        labs(title = "Outcome Percent by Animals Age", y = "Percent", x = "Outcome Types group by ages")
+```
+
+We can see that older animals are mostly returned to the owner. The younger animals are transferred and the ones between 1 month and 1 year old are adopted. In conclusion, the age of animals has a significant influance on the outcomes. Therefore, creating groups of age like this will help.
+
+
+## 2.5 Animal's Sterility
+We want to see if extracting information that check if the animal is sterile or not will have influance on the outcomes. Generally, people who want to adopt a dog or a cat want to know if the animal is sterile or intact. Let's see if this is true with our dataset.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.copy$SexuponOutcome[grep("Intact", train$SexuponOutcome)] <- "Intact"
+train.copy$SexuponOutcome[c(grep("Spayed", train$SexuponOutcome), grep("Neutered", train$SexuponOutcome))] <- "Sterile"
+train.copy$SexuponOutcome[train$SexuponOutcome == 0] <- "Unknown"
+
+train.sterile <- ddply(train.copy, .(SexuponOutcome), summarise,
+                   proportion = as.numeric(prop.table(table(OutcomeType))),
+                   OutcomeType = names(table(OutcomeType)))
+print(train.sterile)
+ggplot(train.sterile, aes(OutcomeType, proportion, fill = SexuponOutcome)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_y_continuous(labels = percent) +
+        labs(title = "Outcome Percent by Animals Sterility", y = "Percent", x = "Outcome Types group by Sterility")
+```
+
+We can see that sterile animals are mostly adopted which confirms our hypothesis. Unknown or intact animals are mostly transfered. Note that animals that we do not know if they are sterile or not (Unknown) are not adopted. Thus, knowing if the animal is sterile or not has influance on the outcomes.
+
+
+## 2.6 Date & Time
+
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.copy$WeekDay <- weekdays(as.Date(train$DateTime))
+
+train.weekday <- ddply(train.copy, .(WeekDay), summarise,
+                       proportion = as.numeric(prop.table(table(OutcomeType))),
+                       OutcomeType = names(table(OutcomeType)))
+print(train.weekday)
+ggplot(train.weekday, aes(OutcomeType, proportion, fill = WeekDay, width = 0.5)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_y_continuous(labels = percent) +
+        labs(title = "Outcome Percent by Weekday", y = "Percent", x = "Outcome Types group by Weekday")
+```
+
+From the bar chart, we can see that animals are mostly adopted the weekend (Saturday and Sunday). This makes sense since most of people are working from Monday to Friday. Also, the weekend, there is less euthanasias, transfers and returns to owner. Looking at the website [Austin Animal Center](http://www.austintexas.gov/department/animal-services), animal receiving are only from 11am - 5pm the weekend and 11am - 7pm the other days. From these information, we suppose that extracting the hour from the `DateTime` feature could have influance on the outcomes.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.hours <- hour(ymd_hms(train$DateTime))
+train.copy$OpenHours[train.hours >= 7 & train.hours < 21] <- "Day"
+train.copy$OpenHours[train.hours < 7 | train.hours >= 21] <- "Night"
+
+train.isnight <- ddply(train.copy, .(OpenHours), summarise,
+                      proportion = as.numeric(prop.table(table(OutcomeType))),
+                      OutcomeType = names(table(OutcomeType)))
+print(train.isnight)
+ggplot(train.isnight, aes(OutcomeType, proportion, fill = OpenHours)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_y_continuous(labels = percent) +
+        labs(title = "Outcome Percent in function of Day or Night", y = "Percent", x = "Outcome Types group")
+```
+
+From the bar chart, transfers of animals are mostly done the night (between 9pm and 7am). Euthanasias, returns to owner and adoptions are mostly done during the day (between 7am and 9pm).
+
+
+## 2.7 Convert Feature Values to Integers
+The objective is to replace every unique feature's values by their corresponding integer. Features like `AnimalType` and `OutcomeType` are replaced by their corresponding `ID` as specified in the Code Book.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.animal.type <- ddply(train, .(AnimalType), summarise,
+                           proportion = as.numeric(prop.table(table(OutcomeType))),
+                           OutcomeType = names(table(OutcomeType)))
+print(train.animal.type)
+ggplot(train.animal.type, aes(OutcomeType, proportion, fill = AnimalType)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_y_continuous(labels = percent) +
+        labs(title = "Outcome Percent by Animal Types", y = "Percent", x = "Outcome Types by Animal Types")
+
+train$AnimalType <- CategoryToInteger(train$AnimalType)
+test$AnimalType <- CategoryToInteger(test$AnimalType)
+```
+
+
+# 3 Feature Engineering
+In this section, we add and remove features from the dataset. We also transform each feature in categories represented by a positive integer. The objective is to clean and prepare the dataset for our prediction's model and to answer the questions: `Are there features that can be split in many other features? If yes, are they improving the score? Why and how?`. The answerr to those questions will be the conclusion of this section.
+
+
+## 3.1 Removing Features
+We remove the features `AnimalID`, `OutcomeSubtype` and `OutcomeType`.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train$AnimalID <- NULL
+test.id <- test$ID
+test$ID <- NULL
+
+train$OutcomeSubtype <- NULL
+```
+
+
+## 3.2 Adding Features
+The objective is to look at each feature of the dataset and split them if there are more information given than what the feature's name tells. For example, the feature `SexuponOutcome` tells us more than just the sex of the animal regarding the possible values.
+
+
+### 3.2.1 DateTime Feature
+From the feature `DateTime` of the dataset, we extract the date and the time separately. We replace the `DateTime` feature by 2 new features named `Date` and `Time`. Those features are transformed to positive integers. Also, knowing the weekday 
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train$WeekDay <- as.POSIXlt(train$DateTime)$wday
+test$WeekDay <- as.POSIXlt(test$DateTime)$wday
+
+train.date <- ymd_hms(train$DateTime)
+train.hours <- hour(train.date)
+train$Date <- year(train.date) * 10000 + month(train.date) * 100 + day(train.date)
+train$Time <- train.hours * 100 + minute(train.date)
+train$OpenHours <- ifelse(train.hours >= 7 & train.hours < 21, 1, 0)
+
+test.date <- ymd_hms(test$DateTime)
+test.hours <- hour(test.date)
+test$Date <- year(test.date) * 10000 + month(test.date) * 100 + day(test.date)
+test$Time <- hour(test.date) * 100 + minute(test.date)
+test$OpenHours <- ifelse(test.hours >= 7 & test.hours < 21, 1, 0)
+
+train$DateTime <- NULL
+test$DateTime <- NULL
+```
+
+
+### 3.2.2 Age by Categories
+We have seen that age of animals separated in 3 categories has influance on outcomes.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train$AgeGroup <- train$AgeuponOutcome
+train$AgeGroup[train$AgeuponOutcome <= 30] <- 1
+train$AgeGroup[train$AgeuponOutcome <= 365 & train$AgeuponOutcome > 30] <- 2
+train$AgeGroup[train$AgeuponOutcome > 365] <- 3
+
+test$AgeGroup <- test$AgeuponOutcome
+test$AgeGroup[test$AgeuponOutcome <= 30] <- 1
+test$AgeGroup[test$AgeuponOutcome <= 365 & test$AgeuponOutcome > 30] <- 2
+test$AgeGroup[test$AgeuponOutcome > 365] <- 3
+
+# train$LessThanMonth <- ifelse(train$AgeuponOutcome <= 480, 1, 0)
+# test$LessThanMonth <- ifelse(test$AgeuponOutcome <= 480, 1, 0)
+# 
+# train$Upto1Years <- ifelse(train$AgeuponOutcome <= 2555 & train$AgeuponOutcome > 480, 1, 0)
+# test$Upto1Years <- ifelse(test$AgeuponOutcome <= 2555 & test$AgeuponOutcome > 480, 1, 0)
+# 
+# train$MoreThan1Years <- ifelse(train$AgeuponOutcome >= 2555, 1, 0)
+# test$MoreThan1Years <- ifelse(test$AgeuponOutcome >= 2555, 1, 0)
+```
+
+
+### 3.2.3 SexuponOutcome Feature
+This feature contains information on the sex of the animal and if the animal is sterile or intact. Thus, we create two features named `Sex` and `IsIntact` that will replace the feature `SexuponOutcome`.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.sex.male.list <- grep("Male", train$SexuponOutcome)
+train.sex.female.list <- grep("Female", train$SexuponOutcome)
+train$Sex <- 0
+train$Sex[train.sex.male.list] <- 1
+train$Sex[train.sex.female.list] <- 2
+
+test.sex.male.list <- grep("Male", test$SexuponOutcome)
+test.sex.female.list <- grep("Female", test$SexuponOutcome)
+test$Sex <- 0
+test$Sex[test.sex.male.list] <- 1
+test$Sex[test.sex.female.list] <- 2
+
+
+train.sex.intact.list <- grep("Intact", train$SexuponOutcome)
+train.sex.other.list <- c(grep("Spayed", train$SexuponOutcome), grep("Neutered", train$SexuponOutcome))
+train$IsIntact <- 0
+train$IsIntact[train.sex.intact.list] <- 1
+train$IsIntact[train.sex.other.list] <- 2
+
+test.sex.intact.list <- grep("Intact", test$SexuponOutcome)
+test.sex.other.list <- c(grep("Spayed", test$SexuponOutcome), grep("Neutered", test$SexuponOutcome))
+test$IsIntact <- 0
+test$IsIntact[test.sex.intact.list] <- 1
+test$IsIntact[test.sex.other.list] <- 2
+
+train$SexuponOutcome <- NULL
+test$SexuponOutcome <- NULL
+```
+
+
+### 3.2.4 Breed Feature
+For each animal, we verify if it is a mixed breed, a purebred or a crossed breed. We extract this information from the `Breed` feature and add a new feature `BreedType` where all purebred animals are identified with the value 3 per the code book. The mixed breed are identified with the value 1 and crossed breed with value 2.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.breed.mix.list <- grep(" Mix", train$Breed)
+train.breed.cross.list <- grep("/", train$Breed)
+train$BreedType <- 3
+train$BreedType[train.breed.cross.list] <- 2
+train$BreedType[train.breed.mix.list] <- 1
+
+test.breed.mix.list <- grep(" Mix", test$Breed)
+test.breed.cross.list <- grep("/", test$Breed)
+test$BreedType <- 3
+test$BreedType[test.breed.cross.list] <- 2
+test$BreedType[test.breed.mix.list] <- 1
+```
+
+We want to get all possible breeds from the dataset. To process that, we will remove the string `Mix` for mixed breed animals and we will separate breeds from the crossed breed animals. Those are identified by a slash character `/`.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+## New feature 'HairType' where Shorthair = 1, Longhair = 2, Wirehair = 3, Medium Hair = 4, otherwise = 0
+hair.type <- c("Shorthair", "Longhair", "Wirehair", "Medium Hair")
+train$HairType <- GetIntegerFeatureFromGroups(train$Breed, hair.type)
+test$HairType <- GetIntegerFeatureFromGroups(test$Breed, hair.type)
+
+## New feature 'IsDomestic' where Domestic = 1 otherwise = 0
+train$IsDomestic <- GetBooleanFeatureFromGroup(train$Breed, "Domestic")
+test$IsDomestic <- GetBooleanFeatureFromGroup(test$Breed, "Domestic")
+
+## New feature 'IsMiniature' where Miniature = 1 otherwise = 0
+train$IsMiniature <- GetBooleanFeatureFromGroup(train$Breed, "Miniature")
+test$IsMiniature <- GetBooleanFeatureFromGroup(test$Breed, "Miniature")
+
+## New feature 'IsPitbull' where Pit Bull = 1 otherwise = 0
+train$IsPitbull <- GetBooleanFeatureFromGroup(train$Breed, "Pit Bull")
+test$IsPitbull <- GetBooleanFeatureFromGroup(test$Breed, "Pit Bull")
+
+## New feature 'BreedGroup' where Shepherd = 1, Terrier = 2, Pit Bull = 3, Hound = 4, Domestic = 5, Others = 0
+#breed.group <- c("Shepherd", "Terrier", "Pit Bull", "Hound", "Domestic", "Others")
+#train$BreedGroup <- GetIntegerFeatureFromGroups(train$Breed, breed.group)
+#test$BreedGroup <- GetIntegerFeatureFromGroups(test$Breed, breed.group)
+
+## New feature 'IsHound' where Hound = 1 otherwise = 0
+#train$IsHound <- GetBooleanFeatureFromGroup(train$Breed, "Hound")
+#test$IsHound <- GetBooleanFeatureFromGroup(test$Breed, "Hound")
+
+## New feature 'IsLabrador' where Labrador Retriever = 1 otherwise = 0
+#train$IsLabrador <- GetBooleanFeatureFromGroup(train$Breed, "Labrador")
+#test$IsLabrador <- GetBooleanFeatureFromGroup(test$Breed, "Labrador")
+
+## New feature 'IsChihuahua' where Chihuahua = 1 otherwise = 0
+#train$IsChihuahua <- GetBooleanFeatureFromGroup(train$Breed, "Chihuahua")
+#test$IsChihuahua <- GetBooleanFeatureFromGroup(test$Breed, "Chihuahua")
+
+## New feature 'IsTerrier' where Terrier = 1 otherwise = 0
+#train$IsTerrier <- GetBooleanFeatureFromGroup(train$Breed, "Terrier")
+#test$IsTerrier <- GetBooleanFeatureFromGroup(test$Breed, "Terrier")
+
+#train$IsShepherd <- GetBooleanFeatureFromGroup(train$Breed, "Shepherd")
+#test$IsShepherd <- GetBooleanFeatureFromGroup(test$Breed, "Shepherd")
+
+train$Breed <- NULL
+test$Breed <- NULL
+```
+
+
+### 3.2.5 Colors
+With the color feature, we can extract the number of colors. If we find a slash `/` character which we define as a `separator`, then we have 2 colors. If we find `Tricolor`, then this means that we have 3 colors. 
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.tricolor <- grep("Tricolor", train$Color)
+train$NumberOfColors <- str_count(train$Color, "/") + 1
+train$NumberOfColors[train.tricolor] <- 3
+
+test.tricolor <- grep("Tricolor", test$Color)
+test$NumberOfColors <- str_count(test$Color, "/") + 1
+test$NumberOfColors[test.tricolor] <- 3
+```
+
+As we have seen previously, we know that if there is a separator, then we have 2 colors. Thus, we can split the feature `Color` in 2 features: `Color1` and `Color2`. To get `Color1`, we will take all strings without the separator or the left side of the string if a separator is found. For `Color2`, we will take the right side of all strings containing the separator. Those features will be converted as a positive integer where each represents a specific color. `Color2` is 0 if and only if there is no separator.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.colors <- unique(c(gsub(".*/", "", train$Color), gsub("/.*", "", train$Color)))
+train.colors.list <- unique(gsub(" .*$", "", train.colors))
+indices <- grep("/", train$Color)
+
+train.color1 <- gsub("/.*", "", train$Color)
+train$Color1 <- GetIntegerFeatureFromGroups(train.color1, train.colors.list)
+
+train.color2 <- rep("", length(train$Color))
+train.color2[indices] <- gsub(".*/", "", train$Color[indices])
+train$Color2 <- GetIntegerFeatureFromGroups(train.color2, train.colors.list)
+
+
+test.colors <- unique(c(gsub(".*/", "", test$Color), gsub("/.*", "", test$Color)))
+test.colors.list <- unique(gsub(" .*$", "", test.colors))
+indices <- grep("/", test$Color)
+
+test.color1 <- gsub("/.*", "", test$Color)
+test$Color1 <- GetIntegerFeatureFromGroups(test.color1, test.colors.list)
+
+test.color2 <- rep("", length(test$Color))
+test.color2[indices] <- gsub(".*/", "", test$Color[indices])
+test$Color2 <- GetIntegerFeatureFromGroups(test.color2, test.colors.list)
+
+train$Color <- NULL
+test$Color <- NULL
+```
+
+We can extract qualifier of colors for every color containing a space character which we define as our qualifier separator. This new feature will be named `ColorQualifier` and will be 0 if there is no qualifier.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+colors.indices <- grep(" ", train.colors)
+train.qualifiers <- unique(gsub(".* ", "", train.colors[colors.indices]))
+
+indices <- grep(" ", train.color1)
+train$ColorQualifier1 <- rep("", length(train.color1))
+train$ColorQualifier1[indices] <- gsub(".* ", "", train.color1[indices])
+train$ColorQualifier1 <- GetIntegerFeatureFromGroups(train$ColorQualifier1, train.qualifiers)
+
+indices <- grep(" ", train.color2)
+train$ColorQualifier2 <- rep("", length(train.color2))
+train$ColorQualifier2[indices] <- gsub(".* ", "", train.color2[indices])
+train$ColorQualifier2 <- GetIntegerFeatureFromGroups(train$ColorQualifier2, train.qualifiers)
+
+
+colors.indices <- grep(" ", test.colors)
+test.qualifiers <- unique(gsub(".* ", "", test.colors[colors.indices]))
+
+indices <- grep(" ", test.color1)
+test$ColorQualifier1 <- rep("", length(test.color1))
+test$ColorQualifier1[indices] <- gsub(".* ", "", test.color1[indices])
+test$ColorQualifier1 <- GetIntegerFeatureFromGroups(test$ColorQualifier1, test.qualifiers)
+
+indices <- grep(" ", test.color2)
+test$ColorQualifier2 <- rep("", length(test.color2))
+test$ColorQualifier2[indices] <- gsub(".* ", "", test.color2[indices])
+test$ColorQualifier2 <- GetIntegerFeatureFromGroups(test$ColorQualifier2, test.qualifiers)
+```
+
+
+# 4 Training Model
+In this section, we present what algorithm is used, why are we using it and how it is used. The objective is to build the final submission file containing the probabilities for each outcome type of each animal given in the test set. 
+
+
+## 4.1 Fine Tuning Parameters
+We prepare the parameters and matrices for the cross-validation and final prediction. Since we need to get the probabilities for each class, then the objective used is `multi:softprob`. We have found that the evaluation metric used is the multi-class log loss function which is `mlogloss` for the `XGBoost` algorithm.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+outcomes.string <- sort(unique(train$OutcomeType))
+indices <- order(unique(train$OutcomeType))
+outcome.type <- CategoryToInteger(train$OutcomeType) - 1
+train$OutcomeType <- NULL
+
+outcome.class.num <- length(outcomes.string)
+param <- list(objective        = "multi:softprob",
+              num_class        = outcome.class.num,    # number of classes
+              eta              = 0.1,      # Control the learning rate
+              subsample        = 0.75,     # Subsample ratio of the training instance
+              max_depth        = 8,        # Maximum depth of the tree
+              colsample_bytree = 0.85,     # Subsample ratio of columns when constructing each tree
+              eval_metric      = "mlogloss")
+```
+
+
+## 4.2 Cross-Validation
+We do a cross-validation to get the optimal number of trees and multi-class log-loss score.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+### Cross-Validation
+cv.nfolds <- 10
+cv.nrounds <- 250
+
+train.matrix <- xgb.DMatrix(data.matrix(train), label = outcome.type)
+model.cv <- xgb.cv(data     = train.matrix, 
+                   nfold    = cv.nfolds, 
+                   param    = param, 
+                   nrounds  = cv.nrounds, 
+                   verbose  = 0)
+model.cv$names <- as.integer(rownames(model.cv))
+
+cv.plot.title <- paste("Training log-loss using", cv.nfolds, "folds CV")
+print(ggplot(model.cv, aes(x = names, y = test.mlogloss.mean)) + 
+      geom_line() + 
+      ggtitle(cv.plot.title) + 
+      xlab("Number of trees") + 
+      ylab("log-loss"))
+     
+print(model.cv)
+best <- model.cv[model.cv$test.mlogloss.mean == min(model.cv$test.mlogloss.mean), ]
+cat("\nOptimal testing set Log-Loss score:", best$test.mlogloss.mean)
+cat("\nBest testing set Log-Loss score:", best$test.mlogloss.mean - (best$test.mlogloss.std / 2))
+cat("\nInterval testing set Log-Loss score: [", best$test.mlogloss.mean - best$test.mlogloss.std, ", ", best$test.mlogloss.mean + best$test.mlogloss.std, "].")
+cat("\nDifference between optimal training and testing sets Log-Loss:", best$train.mlogloss.mean - best$test.mlogloss.mean)
+cat("\nOptimal number of trees:", best$names)
+```
+
+
+## 4.3 Prediction
+We proceed to the predictions of the test set. After testing, this number of trees seems to be optimal with the parameters given above.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+nrounds <- as.integer(best$names)
+
+model = xgboost(param = param, 
+                train.matrix, 
+                nrounds = nrounds,
+                verbose = 0,
+                probability = TRUE)
+
+test.matrix <- xgb.DMatrix(data.matrix(test))
+
+prediction.test <- predict(model, test.matrix)
+prediction.train <- predict(model, train.matrix)
+
+#Check which features are the most important.
+names <- dimnames(train)[[2]]
+importance.matrix <- xgb.importance(names, model = model)
+print(importance.matrix)
+
+# Display the features importance.
+print(xgb.plot.importance(importance.matrix))
+```
+
+
+## 4.4 Multi-class Log-Loss
+We can verify how our predictions score under the multi-class log-loss function. We take our predictions applied to the train set and we compare to the real `OutcomeType` values of the train set.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+prediction.train <- matrix(prediction.train, ncol = outcome.class.num, byrow = TRUE)
+
+rows <- nrow(train)
+outcomes <- matrix(0, nrow = rows, ncol = outcome.class.num)
+for(i in 1:rows)
+{
+    outcomes[i ,outcome.type[i] + 1] <- 1
+}
+
+multiclass.logloss <- MultiLogLoss(prediction.train, outcomes)
+print(multiclass.logloss)
+```
+
+
+## 4.5 Submission
+We write the `ID` and the predicted outcome classes in the submission file.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+prediction.test <- data.frame(matrix(prediction.test, ncol = outcome.class.num, byrow = TRUE))[, indices]
+colnames(prediction.test) <- outcomes.string
+submission <- cbind(data.frame(ID = test.id), prediction.test)
+write.csv(submission, "Submission.csv", row.names = FALSE)
+```
