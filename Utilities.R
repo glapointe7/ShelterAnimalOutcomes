@@ -11,13 +11,6 @@ library(plyr)
 library(MLmetrics)
 library(Ckmeans.1d.dp)
 
-## Outcome string constants
-Outcome.ADOPTION <- "Adoption"
-Outcome.DIED <- "Died"
-Outcome.EUTHANASIA <- "Euthanasia"
-Outcome.RETURN_TO_OWNER <- "Return_to_owner"
-Outcome.TRANSFER <- "Transfer"
-
 
 CategoryToInteger <- function(feature)
 {
@@ -52,4 +45,22 @@ GetIntegerFeatureFromGroups <- function(feature, groups)
     }
     
     return(feature.group)
+}
+
+## 
+CreateDataframeFromThreshold <- function(prediction, threshold)
+{
+    prediction.ncol <- ncol(prediction)
+    x <- apply(prediction, 1, function(x) which(x >= threshold))
+    for(i in 1:length(x))
+    {
+        if(length(x[[i]]) > 0)
+        {
+            row <- rep(0, prediction.ncol)
+            row[x[[i]][[1]]] <- 1
+            prediction[i, ] <- row
+        }
+    }
+    
+    return(prediction)
 }

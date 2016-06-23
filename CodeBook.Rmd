@@ -5,131 +5,125 @@ date: "May 14, 2016"
 output: html_document
 ---
 
-# 1 Missing Values
-In this section, we identify all missing or special values in the dataset and we give their meaning.
+# 1 Dataset
+The dataset contains 2 files: train.csv and test.csv. 
+
+* The train set contains 26729 observations (animals) and 10 features. 
+* The test set contains 11456 observations (animals) and 8 features.
+
+| Feature        | Type     | Description   |
+| -------------- | -------- | ------------- |
+| AnimalID       | String   | The unique identification of the animal which starts by the letter `A` in the train set. |
+| Name           | String   | The name of the animal if the animal has one. |
+| DateTime       | DateTime | Date and time when the animal's outcome happens in the center. Format is `yyyy-mm-dd hh:mm:ss`. |
+| OutcomeType    | String   | The animal's outcome. |
+| OutcomeSubtype | String   | Extra information associated to the outcome (reason of the outcome). |
+| AnimalType     | String   | Animal's type (e.g. Dog, Cat). |
+| SexuponOutcome | String   | The sex of the animal and the animal's sterility type. |
+| AgeuponOutcome | String   | The age of the animal given in days, weeks, months or years. |
+| Breed          | String   | The breed(s) of the animal and if cross breed, the breeds are seperated by a slash character `/`. |
+| Color          | String   | The color(s) of the animal and if more than one color, the colors are seperated by a slash character `/`. |
+
+
+# 2 Missing Values
+In this section, we identify all missing or unknown values in the dataset and we give their meaning.
 
 | Value          | Description   |
 | -------------- | ------------- |
-| Blank          | We don't have any value about that animal's feature. |
-| Unknown        | We don't have information on this animal's feature. |
-| 0              |  |
+| Blank          | This is a missing value about the animal for a given feature except for the `Name` feature where it means that the animal has no name. |
+| Unknown        | We don't have information on this animal for a given feature. |
+| 0              | This value may happen in the `AgeuponOutcome` feature and means that the age is unknown. |
+
+There is no `NaN`, infinity or negative values in both data sets.
 
 
-# 2 Feature Categories
-
-## 2.1 AnimalID
-Represent the identification of the animal. There are no observations with blank value. In the train set, the `AnimalID` starts with the letter `A` followed by an positive integer of 6 digits. In the test set, the `AnimalID` is in the range 1 to 11456.
-
-## 2.2 Name
-This feature represents the name of the animal given by their owner. There is no category for this feature. Blank values mean that the animal has no name.
-
-## 2.3 DateTime
-This feature represents the date and time when the animal leaves the Animal Center.
-
-## 2.4 OutcomeType
-This feature represents the outcome of the animal. We will associate a positive integer starting to 1 when it is not a blank value. In case of a blank value, the integer will be 0.
-
-| ID             | Category Name |
-| -------------- | ------------- |
-| 0              | Adoption |
-| 1              | Died |
-| 2              | Euthanasia |
-| 3              | Return_to_owner |
-| 4              | Transfer |
-
-## 2.5 OutcomeSubtype
-This feature represents the outcome subtype of the animal. We will associate a positive integer starting to 1 when it is not a blank value. In case of a blank value, the integer will be 0.
-
-### 2.5.1 Adoption Outcome Type
-| ID             | Name     |
-| -------------- | -------- |
-| 0              | Blank |
-| 1              | Foster |
-| 2              | Offsite |
-| 3              | Barn |
-
-### 2.5.2 Euthanasia Outcome Type
-| ID             | Name     |
-| -------------- | -------- |
-| 0              | Blank |
-| 1              | Suffering |
-| 2              | Aggressive |
-| 3              | Behavior |
-| 4              | Rabies Risk |
-| 5              | Medical |
-
-### 2.5.3 Transfer Outcome Type
-| ID             | Name     |
-| -------------- | -------- |
-| 0              | Blank |
-| 1              | Partner |
-| 2              | SCRP (Sharing Clinical Reports Project) |
-| 3              | Barn |
-
-### 2.5.4 Died Outcome Type
-| ID             | Name       |
-| -------------- | ---------- |
-| 0              | Blank      |
-| 1              | In Kennel  |
-| 2              | In Foster  |
-| 3              | Enroute    |
-| 4              | At Vet     |
-| 5              | In Surgery |
-
-### 2.5.5 Return to owner Outcome Type
-| ID             | Name     |
-| -------------- | -------- |
-| 0              | Blank    |
+# 3 Features
+In this section, we describe in more details the possible values for some features.
 
 
-## 2.6 AnimalType	
-This feature represents the type of animals. There are two possible types:
-
-| ID             | Type       |
-| -------------- | ---------- |
-| 1              | Dog        |
-| 2              | Cat        |
-
-## 2.7 SexuponOutcome	
-This feature represents the animal's sex and mention if the male is neutered or intact, or the female is spayed or intact. Some of the values are unknown or blank. This feature can be split in two features. The first one is the animal's sex.
-
-| ID             | Sex      |
-| -------------- | -------- |
-| 0              | Unknown  |
-| 1              | Male     |
-| 2              | Female   |
-
-The second one for the male:
-| ID             | Type     |
-| -------------- | -------- |
-| 0              | Unknown  |
-| 1              | Intact   |
-| 2              | Neutered |
-
-For the female:
-| ID             | Type     |
-| -------------- | -------- |
-| 0              | Unknown  |
-| 1              | Intact   |
-| 2              | Spayed   |
+## 3.1 AnimalID
+Represent the identification of the animal. There are no observations with blank value. In the train set, the `AnimalID` starts with the letter `A` followed by a positive integer of 6 digits (e.g. A671945). In the test set, the `AnimalID` is in the range 1 to 11456.
 
 
-## 2.8 AgeuponOutcome	
-This feature represents the age of animals. The age is expressed in 4 possible format excluding the blank values:
+## 3.2 OutcomeType
+This feature represents the outcome of the animal. We will associate a positive integer starting to 0.
+
+| Possible Values | Description |
+| --------------- | ----------- |
+| Adoption        | When the animal leaves the center because he is adopted. |
+| Died            | When the animal died. |
+| Euthanasia      | When the animal is euthanased. |
+| Return_to_owner | When the animal leaves the center because he is returned to its owner. |
+| Transfer        | When the animal leaves the center because he is transferred to another center or laboratory. |
+
+
+## 3.3 OutcomeSubtype
+This feature represents the outcome subtype of the animal. 
+
+### 3.3.1 Adoption Outcome Type
+| Name     |
+| -------- |
+| Blank    |
+| Foster   |
+| Offsite  |
+| Barn     |
+
+### 3.3.2 Euthanasia Outcome Type
+| Name        |
+| ----------- |
+| Blank       |
+| Suffering   |
+| Aggressive  |
+| Behavior    |
+| Rabies Risk |
+| Medical     |
+
+### 3.3.3 Transfer Outcome Type
+| Name     |
+| -------- |
+| Blank    |
+| Partner  |
+| SCRP (Sharing Clinical Reports Project) |
+| Barn     |
+
+### 3.3.4 Died Outcome Type
+| Name       |
+| ---------- |
+| Blank      |
+| In Kennel  |
+| In Foster  |
+| Enroute    |
+| At Vet     |
+| In Surgery |
+
+### 3.3.5 Return to owner Outcome Type
+There is no extra information for this outcome type, thus the cells are always left blank.
+
+
+## 3.4 AnimalType	
+This feature represents the type of animals.
+
+| Type       |
+| ---------- |
+| Dog        |
+| Cat        |
+
+## 3.5 SexuponOutcome	
+This feature represents the animal's sex and mention if the male is neutered or intact, or the female is spayed or intact. Some of the values are unknown or blank.
+
+| Sex           | Description   |
+| ------------- | ------------- |
+| Unknown       | No information about the sterility of the animal. |
+| Intact Male   | Male not sterile |
+| Neutered Male | Sterile Male |
+| Intact Female | Female not sterile |
+| Spayed Female | Sterile Female |
+
+
+## 3.6 AgeuponOutcome	
+This feature represents the age of animals. The age is expressed in 4 possible formats excluding the blank or zero values:
 
 * In days between 1 and 6 (e.g. 3 days)
 * In weeks between 1 and 4 (e.g. 2 weeks)
-* In months between 1 and 12 (e.g. 7 months)
+* In months between 1 and 11 (e.g. 7 months)
 * In years (e.g. 17 years)
-
-## 2.9 Breed
-This feature represents the animal's breed and can be split in two parts following the dataset. The first part represents if the animal is a mixed breed or a purebred. Mixed breed animals are identified as `Mix` or with a slash character `/` in their value. The purebred never contin a slash character `/` or the whole word string `Mix` in their value.
-
-| ID             | Name     |
-| -------------- | -------- |
-| 1              | Mix      |
-| 2              | Purebred |
-
-
-## 2.10 Color
-
