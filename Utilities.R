@@ -5,22 +5,23 @@ library(methods)
 library(Matrix)
 library(ggplot2)
 library(scales)
-library(plotrix)
-library(dplyr)
+library(data.table)
+#library(plotrix)
 library(plyr)
+library(dplyr)
 library(MLmetrics)
 library(Ckmeans.1d.dp)
 
 
-CategoryToInteger <- function(feature)
-{
-    feature.categories <- unique(feature)
-    feature.categories.id <- 1:length(feature.categories)
-    names(feature.categories.id) <- as.vector(feature.categories)
-    feature <- feature.categories.id[feature]
-    
-    return(feature)
-}
+# CategoryToInteger <- function(feature)
+# {
+#     feature.categories <- unique(feature)
+#     feature.categories.id <- 1:length(feature.categories)
+#     names(feature.categories.id) <- as.vector(feature.categories)
+#     feature <- feature.categories.id[feature]
+#     
+#     return(feature)
+# }
 
 
 GetBooleanFeatureFromGroup <- function(feature, group)
@@ -48,19 +49,19 @@ GetIntegerFeatureFromGroups <- function(feature, groups)
 }
 
 ## 
-CreateDataframeFromThreshold <- function(prediction, threshold)
-{
-    prediction.ncol <- ncol(prediction)
-    x <- apply(prediction, 1, function(x) which(x >= threshold))
-    for(i in 1:length(x))
-    {
-        if(length(x[[i]]) > 0)
-        {
-            row <- rep(0, prediction.ncol)
-            row[x[[i]][[1]]] <- 1
-            prediction[i, ] <- row
-        }
-    }
-    
-    return(prediction)
-}
+# CreateDataframeFromThreshold <- function(prediction, threshold)
+# {
+#     prediction.ncol <- ncol(prediction)
+#     x <- apply(prediction, 1, function(x) which(x >= threshold))
+#     for(i in 1:length(x))
+#     {
+#         if(length(x[[i]]) > 0)
+#         {
+#             row <- rep(0, prediction.ncol)
+#             row[x[[i]][[1]]] <- 1
+#             prediction[i, ] <- row
+#         }
+#     }
+#     
+#     return(prediction)
+# }

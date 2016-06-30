@@ -2,7 +2,9 @@
 title: "Shelter Animal Outcomes"
 author: "Gabriel Lapointe"
 date: "May 13, 2016"
-output: html_document
+output: 
+  html_document: 
+    toc: yes
 variant: markdown_github
 ---
 
@@ -32,7 +34,8 @@ Before we start the exploration of the dataset, we need to write a list of quest
 
 Questions on features:
 
-* What is the proportion of animals for each outcome?
+* Are features in the dataset sufficiant to explain each outcome?
+* What is the proportion of animals and how many cats and dogs are they for each outcome?
 * Are there features that can be split in many other features? If yes, are they improving the score? Why and how?
 * For each outcome, what features have the most importance and why?
 
@@ -41,24 +44,33 @@ Questions on features:
 Since we have 5 outcome types where we need to calculate a prediction's probability for each class (outcome type), we have to manage 5 classes using a multi-class algorithm. The `Log Loss` function quantifies the accuracy of a classifier by penalising false classifications. Minimising the `Log Loss` function is basically equivalent to maximising the accuracy of the classifier which is what we need.
 
 Thus, Kaggle provides us the evaluation metric we need:
-$$LogLoss = -\frac{1}{N} \sum_{i = 0}^N \sum_{j = 0}^M y_{ij} \log{\mathbb{P}_{ij}}$$
+$$LogLoss = -\frac{1}{N} \sum_{i = 0}^N \sum_{j = 0}^M y_{i,j} \log{\mathbb{P}_{i,j}}$$
 where 
     $N$ is the total number of animals, 
     $M$ is the number of outcomes, 
-    $y_{ij}$ is 1 if observation $i$ is in outcome $j$ and 0 otherwise,
-    $\mathbb{P}_{ij}$ is the predicted probability that observation $i$ belongs to outcome $j$.
+    $y_{i,j}$ is 1 if observation $i$ is in outcome $j$ and 0 otherwise,
+    $\mathbb{P}_{i,j}$ is the predicted probability that observation $i$ belongs to outcome $j$.
+
+
+## 1.5 Methodology
+When we will evaluate a model, we will train it first with the training set. When our model will be chosen, we will test it with this model. We will also use cross-validation since we are limited with the data given.
+
+Since the output to predict is known and well defined, we will use a supervised algorithm to solve the problem. This is a multi-class problem where we have to give a probability for each class. 
+
+In this document, we start by exploring the dataset and build the data story behind it. This will give us important insights which will answer our questions on this dataset. The next step is to do some feature engineering which consists to create, remove or replace features following insights we got when exploring the dataset. We will ensure our new dataset is a valid input for our prediction model. After applying our model to the test set, we will visualize the predictions calculated and explain the results.
+
 
 
 # 2 Exploratory Analysis
 In this section, we explore the dataset and we test hypotheses on features. The objective is to visualize and understand the dataset we have to solve the problem. We will also compare changes we will make to this dataset to validate if they have significant influance on the outcomes or not.
 
-We load the test and train datasets, and set the seed. All blank, space and unknown values are replaced by the value `0`. This will be explained in the next section about feature engineering.
+We load the test and train datasets, and set the seed. All blank, space and unknown values are replaced by the value `0`. After writting the code book, we have seen that unique values in all features except the ID can be interpreted as Categories which can be grouped by another feature. In this way, the unknown, space or blank values can be treated as a Category ID as well. Thus, we decide to set their value to 0.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
 source("Utilities.R")
 
-train <- read.csv("train.csv", header = TRUE, na.strings = c("", " ", "Unknown"), stringsAsFactors = FALSE)
-test <- read.csv("test.csv", header = TRUE, na.strings = c("", " ", "Unknown"), stringsAsFactors = FALSE)
+train <- read.csv("train.csv", header = TRUE, na.strings = c("", " ", "Unknown", "0 years"), stringsAsFactors = FALSE)
+test <- read.csv("test.csv", header = TRUE, na.strings = c("", " ", "Unknown", "0 years"), stringsAsFactors = FALSE)
 
 set.seed(1234)
 
@@ -69,57 +81,8 @@ test[is.na(test)] <- 0
 Regarding the features possible values, we will use bar charts to visualize our analysis of the dataset.
 
 
-### 2.1 Convert AgeuponOutcome Values to Days
-We transform the feature `AgeuponOutcome` to integer values. The age will be counted in days. For example, `2 year` will be replaced by the value 2 * 365 = 730. For months, the formula will be `age * 30`. For weeks, the formula will be `age * 7`. Finally, for years, the formula will be `age * 365`.
-
-```{r echo = TRUE, message = FALSE, warning = FALSE}
-## Get the list of integer extracted from the feature AgeuponOutcome.
-train.age <- as.integer(regmatches(train$AgeuponOutcome, regexpr("[[:digit:]]+", train$AgeuponOutcome)))
-test.age <- as.integer(regmatches(test$AgeuponOutcome, regexpr("[[:digit:]]+", test$AgeuponOutcome)))
-
-## Get row index list where AgeuponOutcome contains "year", "month", "week" or "day".
-## Get the correspondant integer from each row index and apply the formula to get all ages in years.
-train.year.list <- grep("year", train$AgeuponOutcome)
-train$AgeuponOutcome[train.year.list] <- train.age[train.year.list] * 365
-train.month.list <- grep("month", train$AgeuponOutcome)
-train$AgeuponOutcome[train.month.list] <- train.age[train.month.list] * 30
-train.week.list <- grep("week", train$AgeuponOutcome)
-train$AgeuponOutcome[train.week.list] <- train.age[train.week.list] * 7
-train.day.list <- grep("day", train$AgeuponOutcome)
-train$AgeuponOutcome[train.day.list] <- train.age[train.day.list]
-
-test.year.list <- grep("year", test$AgeuponOutcome)
-test$AgeuponOutcome[test.year.list] <- test.age[test.year.list] * 365
-test.month.list <- grep("month", test$AgeuponOutcome)
-test$AgeuponOutcome[test.month.list] <- test.age[test.month.list] * 30
-test.week.list <- grep("week", test$AgeuponOutcome)
-test$AgeuponOutcome[test.week.list] <- test.age[test.week.list] * 7
-test.day.list <- grep("day", test$AgeuponOutcome)
-test$AgeuponOutcome[test.day.list] <- test.age[test.day.list]
-
-train$AgeuponOutcome <- as.integer(train$AgeuponOutcome)
-test$AgeuponOutcome <- as.integer(test$AgeuponOutcome)
-
-age.summary <- summary(train$AgeuponOutcome)
-print(age.summary)
-```
-
-Lets see the distribution of the age with an histogram.
-
-```{r echo = TRUE, message = FALSE, warning = FALSE}
-train.copy <- train
-train.copy$AgeuponOutcome[train.copy$AgeuponOutcome < 365] <- 0
-train.copy$AgeuponOutcome <- train.copy$AgeuponOutcome / 365
-ggplot(train.copy, aes(x = AgeuponOutcome)) + 
-    geom_histogram(aes(y = ..density..), binwidth = 1, colour = "black", fill = "white") +
-    labs(title = "Density in function of the Age", y = "Density", x = "Age in days")
-```
-
-We can see that the age can be approximated by the exponential distribution from the density shown in the histogram above. 
-
-
-## 2.2 Outcomes Visualization
-The objective is to answer the question: `What is the proportion of animals for each outcome?`. Let's visualize how the outcomes are split in the train set with the following histogram.
+## 2.1 Outcomes Visualization
+The objective is to answer the question: `What is the proportion of animals and how many cats and dogs are they for each outcome?`. Let's visualize how the outcomes are split in the train set with the following histogram.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
 ggplot(train, aes(OutcomeType)) +
@@ -129,159 +92,261 @@ ggplot(train, aes(OutcomeType)) +
         labs(title = "Percentage for each outcome from the train set", y = "Percentage", x = "Outcome Types")
 ```
 
-
-### 2.3 Named vs Not Named Animals
-The feature `Name` is transformed to a boolean value where the value is 0 when the animal has no name, and 1 otherwise. Logically, the name of an animal should not have any impact on the outcomes. But knowing that an animal has no name versus has a name may influance the outcomes. 
+This bar chart shows that adoptions and transfers are mostly occuring. Now, we need to know how many cats and dogs are they for each outcome.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-train$Name[train$Name != 0] <- 1
-test$Name[test$Name != 0] <- 1
-
-train$NameLength <- ifelse(train$Name == 0, 0, str_length(train$Name))
-test$NameLength <- ifelse(test$Name == 0, 0, str_length(test$Name))
-```
-
-Let's take a look on the plot if this has a signifiant influance on the outcomes.
-
-```{r echo = TRUE, message = FALSE, warning = FALSE}
-train.named <- ddply(train, .(Name), summarise,
-                     proportion = as.numeric(prop.table(table(OutcomeType))),
-                     OutcomeType = names(table(OutcomeType)))
-print(train.named)
-ggplot(train.named, aes(OutcomeType, proportion, fill = Name)) +
-        geom_bar(stat = "identity", position = "dodge") +
+ggplot(train, aes(x = OutcomeType)) +
+        geom_bar(aes(y = ..count.. / sum(..count..))) +
+        facet_wrap(~AnimalType, ncol = 2) +
         scale_y_continuous(labels = percent) +
-        labs(title = "Percentage in function of Named vs. Not Named Animals for each outcome", y = "Percentage", x = "Outcome Types")
+        geom_text(aes(y = ..count.. / sum(..count..) , label = scales::percent(..count.. / sum(..count..))), stat = "count", vjust = -0.25) +
+        ggtitle("Percentage of cats and dogs for each outcome") +
+        labs(y = "Percentage", x = "Outcome Types") +
+        theme(axis.text.x = element_text(angle = 90))
 ```
 
-Named animals are mostly adopted since no named animals are transfered from the above histogram. The feature telling if an animal has a name or not influances clearly the outcomes.
+We can see from this bar chart that dogs are returned to their owner almost 8 times (16% for dogs against 1.9% for cats) more than cats. Cats are mostly transferred and dogs are mostly returned to the owner with significant difference. The percentage for the other outcomes are slightly the same.
 
 
-## 2.4 Impact of Age on Outcomes
-We state that most important outcome will be different from a younger to an older animal. We define 'younger' animals all animals that are 1 month or younger, and 'older' animals being 1 year old and older.
+## 2.2 Animal's Age
+The age of animals should be an important factor on outcomes. People want to adopt a young animal (between 1 month and 1 year old) because they can raise the animal more easily and keep it longer. Older animals (Over 1 year old) may have more difficulty to respond to their new master. Baby animals may be subject to a transfer for experimentations or for clinical reasons. Adopting a baby animal needs more attention from the owner. Thus, adoptions should not be frequent for them. Lets see if these hypotheses hold.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-train.copy$AgeuponOutcome[train$AgeuponOutcome <= 30] <- "1 month and younger"
-train.copy$AgeuponOutcome[train$AgeuponOutcome > 30 & train$AgeuponOutcome < 365] <- "Between 1 month and 1 year"
-train.copy$AgeuponOutcome[train$AgeuponOutcome >= 365] <- "1 year and older"
-
-train.age <- ddply(train.copy, .(AgeuponOutcome), summarise,
-                   proportion = as.numeric(prop.table(table(OutcomeType))),
-                   OutcomeType = names(table(OutcomeType)))
-print(train.age)
-ggplot(train.age, aes(OutcomeType, proportion, fill = AgeuponOutcome)) +
-        geom_bar(stat = "identity", position = "dodge") +
-        scale_y_continuous(labels = percent) +
-        labs(title = "Percentage in function of the Age for each outcome", y = "Percentage", x = "Outcome Types")
+train %>% group_by(AgeuponOutcome) %>%
+    ggplot(aes(x = AgeuponOutcome, fill = OutcomeType)) +
+        geom_bar(stat = "count", position = "fill", width = 0.8) + 
+        ggtitle("Age by Outcome Type") +
+        coord_flip() +
+        scale_fill_brewer(palette = "Set1") +
+        theme(axis.title = element_blank())
 ```
 
-We can see that older animals are mostly returned to the owner. The younger animals are transferred and the ones between 1 month and 1 year old are adopted. In conclusion, the age of animals has a significant influance on the outcomes. Therefore, creating groups of age like this will help.
+We can see that between 1 day and 4 weeks old, animals are mostly transferred including unknowns identified by 0. Animals are mostly adopted between 1 month and 1 year old. Finally, animals are euthanasied or returned to their owner specially between 11 years and 20 years old.
 
 
-## 2.5 Animal's Sterility
+## 2.3 Named vs Not Named Animals
+The feature `Name` is transformed to a boolean value where the value is 0 when the animal has no name or his length is 1, and 1 otherwise. Logically, the name of an animal should not have any impact on the outcomes. But knowing that an animal has no name versus has a name may influance the outcomes. 
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.copy <- train
+train.copy$NameLength <- ifelse(train$Name == 0, 0, str_length(train$Name))
+
+train.copy %>% group_by(NameLength) %>%
+    ggplot(aes(x = NameLength, fill = OutcomeType)) +
+        geom_bar(stat = "count", position = "fill", width = 0.8) + 
+        ggtitle("Name length by Outcome Type") +
+        coord_flip() +
+        scale_fill_brewer(palette = "Set1") +
+        theme(axis.title = element_blank())
+```
+
+Named animals are mostly adopted since no named animals are mostly transfered from the above histogram. The feature tells that animals' name influances clearly the outcomes.
+
+
+## 2.4 Animal's Sterility and Sex
 We want to see if extracting information that check if the animal is sterile or not will have influance on the outcomes. Generally, people who want to adopt a dog or a cat want to know if the animal is sterile or intact. Let's see if this is true with our dataset.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-train.copy$SexuponOutcome[grep("Intact", train$SexuponOutcome)] <- "Intact"
-train.copy$SexuponOutcome[c(grep("Spayed", train$SexuponOutcome), grep("Neutered", train$SexuponOutcome))] <- "Sterile"
-train.copy$SexuponOutcome[train$SexuponOutcome == 0] <- "Unknown"
-
-train.sterile <- ddply(train.copy, .(SexuponOutcome), summarise,
-                   proportion = as.numeric(prop.table(table(OutcomeType))),
-                   OutcomeType = names(table(OutcomeType)))
-print(train.sterile)
-ggplot(train.sterile, aes(OutcomeType, proportion, fill = SexuponOutcome)) +
-        geom_bar(stat = "identity", position = "dodge") +
-        scale_y_continuous(labels = percent) +
-        labs(title = "Percentage in function of Animals Sterility for each outcome", y = "Percentage", x = "Outcome Types")
+train %>% group_by(SexuponOutcome) %>%
+    ggplot(aes(x = SexuponOutcome, fill = OutcomeType)) +
+        geom_bar(stat = "count", position = "fill", width = 0.8) + 
+        ggtitle("Sex and sterility by Outcome Type") +
+        coord_flip() +
+        scale_fill_brewer(palette = "Set1") +
+        theme(axis.title = element_blank())
 ```
 
-We can see that sterile animals are mostly adopted which confirms our hypothesis. Unknown or intact animals are mostly transfered. Note that animals that we do not know if they are sterile or not (Unknown) are not adopted. Thus, knowing if the animal is sterile or not has influance on the outcomes.
+We can see that sterile animals are mostly adopted which confirms our hypothesis. Unknown or intact animals are mostly transferred. This makes sense with unknown ones since they may need to be transferred to the clinic to identify clearly their sex and if they are sterile or not. Note that animals that we do not know if they are sterile or not (Unknown) are not adopted. Thus, knowing if the animal is sterile or not has influance on the outcomes.
 
 
-## 2.6 Date & Time
+## 2.5 Date & Time
 The date and time may have a big influance on the outcomes. We have seen that doptions represent the most popular outcome of the dataset. Lets formulate some hypotheses on adoptions, transfers and returns to the owner. We state that
 
-1. people will mostly adopt during the day Lets say that the day starts at 7am and ends at 22pm.
-2. an animal is returned to the owner when an employee is present at the animal center. Thus, mostly at open hours of the center which is the day.
-3. an animal is transferred out of open hours (during the night could be a good time) of the animal center since people can come visiting and maybe adopting an animal.
-4. an animal may die at anytime of the day. 
-5. an animal will be euthanasied mostly during the day. 
+1. people will mostly adopt during the weekend and the afternoon (lets say after work starting at 17h00 for working days).
+2. euthanasias are done mostly the working days (Monday to Friday).
+3. an animal is returned to the owner when an employee is present at the animal center. Thus, mostly at open hours of the center which is the day.
+4. an animal is transferred out of open hours (during the night could be a good time) of the animal center since people can come visiting and maybe adopting an animal.
+5. an animal may die at anytime of the day. 
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
 train.copy$WeekDay <- weekdays(as.Date(train$DateTime))
 
-train.weekday <- ddply(train.copy, .(WeekDay), summarise,
-                       proportion = as.numeric(prop.table(table(OutcomeType))),
-                       OutcomeType = names(table(OutcomeType)))
-print(train.weekday)
-ggplot(train.weekday, aes(OutcomeType, proportion, fill = WeekDay, width = 0.5)) +
-        geom_bar(stat = "identity", position = "dodge") +
-        scale_y_continuous(labels = percent) +
-        labs(title = "Percentage in function of Weekdays for each outcomes", y = "Percentage", x = "Outcome Types")
+train.copy %>% group_by(WeekDay) %>%
+    ggplot(aes(x = WeekDay, fill = OutcomeType)) +
+        geom_bar(stat = "count", position = "fill", width = 0.8) + 
+        ggtitle("Weekdays by Outcome Type") +
+        coord_flip() +
+        scale_fill_brewer(palette = "Set1") +
+        theme(axis.title = element_blank())
 ```
 
-From the bar chart, we can see that animals are mostly adopted the weekend (Saturday and Sunday). This makes sense since most of people are working from Monday to Friday. Also, the weekend, there is less euthanasias, transfers and returns to owner. Looking at the website [Austin Animal Center](http://www.austintexas.gov/department/animal-services), animal receiving are only from 11am - 5pm the weekend and 11am - 7pm the other days. From these information, we suppose that extracting the hour from the `DateTime` feature could have influance on the outcomes. At least, differentiate between before and after noon will be a good start.
+From the bar chart, we can see that animals are mostly adopted the weekend (Saturday and Sunday) which confirm the first hypothesis. This makes sense since most of people are working from Monday to Friday. Also, the weekend, there is less euthanasias, transfers and returns to owner which confirm the second hypothesis. Looking at the website [Austin Animal Center](http://www.austintexas.gov/department/animal-services), animal receiving are only from 11am - 5pm the weekend and 11am - 7pm the other days. From these information, we suppose that extracting the hour from the `DateTime` feature could have influance on the outcomes.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-train.hours <- hour(ymd_hms(train$DateTime))
-train.copy$IsAfternoon[train.hours >= 12] <- "PM"
-train.copy$IsAfternoon[train.hours < 12] <- "AM"
+train.copy$Hours <- hour(ymd_hms(train$DateTime))
 
-train.isafternoon <- ddply(train.copy, .(IsAfternoon), summarise,
-                           proportion = as.numeric(prop.table(table(OutcomeType))),
-                           OutcomeType = names(table(OutcomeType)))
-print(train.isafternoon)
-ggplot(train.isafternoon, aes(OutcomeType, proportion, fill = IsAfternoon)) +
-        geom_bar(stat = "identity", position = "dodge") +
-        scale_y_continuous(labels = percent) +
-        labs(title = "Percentage in function of before vs after noon for each outcome", y = "Percentage", x = "Outcome Types")
+train.copy %>% group_by(Hours) %>%
+    ggplot(aes(x = Hours, fill = OutcomeType)) +
+        geom_bar(stat = "count") + 
+        ggtitle("Hours by Outcome Type") +
+        scale_fill_brewer(palette = "Set1") 
 ```
 
-From the bar chart, transfers of animals are mostly done before noon which prove that hypothesis 3 is true. Adoptions are mostly done during the afternoon which prove that hypotheses 1, 2 and 5 are true. There is no significative difference for animals died, thus the hypothesis 4 is also true. 
+From the bar chart, we see that most of outcomes occur at 5pm and 6pm. Adoptions are also mostly done at 5pm and 6pm. There are no outcomes done between 1am and 4am inclusively. There are transfers done at midnight, but most of them are done between 8am and 7pm. This is also true for euthanasias. Most of outcomes are done between 11am and 7pm which correspond exactly to the open hours of the center.
 
+Looking at the days, we should see more adoptions the weekend since the majority of people are not working.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.copy$Days <- day(ymd_hms(train$DateTime))
+
+train.copy %>% group_by(Days) %>%
+    ggplot(aes(x = Days, fill = OutcomeType)) +
+        geom_bar(stat = "count") +
+        ggtitle("Days by Outcome Type") +
+        scale_fill_brewer(palette = "Set1")
+```
+
+There are 4 days (12, 13, 18, 19) where the count and adoptions are higher than the other days. Also, note that there are less animals on the day 31. This result is explained since only 7 months over 12 have 31 days.
+
+We look now at the months to check if some of them can reveal us important insights.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.copy$Month <- months(ymd_hms(train$DateTime))
+
+train.copy %>% group_by(Month) %>%
+    ggplot(aes(x = Month, fill = OutcomeType)) +
+        geom_bar(stat = "count") +
+        ggtitle("Months by Outcome Type") +
+        scale_fill_brewer(palette = "Set1") +
+        theme(axis.text.x = element_text(angle = 90))
+```
+
+From the bar chart, we can see that October, November and December are months having highest animals count (over 2000). This can be explained by holidays like Christmas and the New Year's day. One possible hypothesis is that children want a dog or a cat for Christmas so they ask their parents to adopt an animal and give them as a Christmas gift.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
 train.copy$Year <- year(ymd_hms(train$DateTime))
 
-train.year <- ddply(train.copy, .(Year), summarise,
-                      proportion = as.numeric(prop.table(table(OutcomeType))),
-                      OutcomeType = names(table(OutcomeType)))
-print(train.year)
-ggplot(train.year, aes(OutcomeType, proportion, fill = Year)) +
-    geom_bar(stat = "identity", position = "dodge") +
-    scale_y_continuous(labels = percent) +
-    labs(title = "Percentage in function of years for each outcome", y = "Percentage", x = "Outcome Types")
+train.copy %>% group_by(Year) %>%
+    ggplot(aes(x = Year, fill = OutcomeType)) +
+        geom_bar(stat = "count", position = "fill", width = 0.8) + 
+        ggtitle("Years by Outcome Type") +
+        coord_flip() +
+        scale_fill_brewer(palette = "Set1") +
+        theme(axis.title = element_blank())
 ```
 
+The difference is not that significant regarding 2016 against 2013 to 2015. There are more adoptions and returns to the owner, but less transfers and euthanasias.
 
-## 2.7 Animal Type
-The objective is to replace every unique feature's values by their corresponding integer. Features like `AnimalType` and `OutcomeType` are replaced by their corresponding `ID` as specified in the Code Book.
+
+## 2.6 Animal's Breed
+For each outcome type, we want to know which animal's breed has the greatest and lowest count.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-train.animal.type <- ddply(train, .(AnimalType), summarise,
-                           proportion = as.numeric(prop.table(table(OutcomeType))),
-                           OutcomeType = names(table(OutcomeType)))
-print(train.animal.type)
-ggplot(train.animal.type, aes(OutcomeType, proportion, fill = AnimalType)) +
-        geom_bar(stat = "identity", position = "dodge") +
-        scale_y_continuous(labels = percent) +
-        labs(title = "Percentage in function of Animal Types for each outcome", y = "Percentage", x = "Outcome Types")
+## SELECT Breed1, OutcomeType, COUNT(Breed1) AS Breed1Count
+## FROM Animal
+## GROUP BY Breed1
+## HAVING Breed1Count > 150
 
-train$AnimalType <- CategoryToInteger(train$AnimalType)
-test$AnimalType <- CategoryToInteger(test$AnimalType)
+breed.nomix <- gsub(" Mix", "", train.copy$Breed)
+train.copy$Breed1 <- strsplit(x = breed.nomix, split = "/") %>% sapply(function(x){x[1]})
+
+breeds.common <- train.copy %>% 
+    group_by(Breed1) %>%
+    filter(n() >= 150)
+
+train.copy$Breed1[!(train.copy$Breed1 %in% breeds.common$Breed1)] <- "Others"
+
+train.copy %>% filter(AnimalType == "Dog") %>% 
+    ggplot(aes(x = Breed1, fill = OutcomeType)) +
+    geom_bar(stat = "count", position = "fill", width = 0.8) +
+    ggtitle("Dog Breeds by Outcome Type") +
+    coord_flip() +
+    scale_fill_brewer(palette = "Set1") +
+    theme(axis.title = element_blank())
+
+train.copy %>% filter(AnimalType == "Cat") %>% 
+    ggplot(aes(x = Breed1, fill = OutcomeType)) +
+    geom_bar(stat = "count", position = "fill", width = 0.8) + 
+    ggtitle("Cat Breeds by Outcome Type") +
+    coord_flip() +
+    scale_fill_brewer(palette = "Set1") +
+    theme(axis.title = element_blank())
 ```
+
+For the dogs, Shih Tzu are mostly transferred and less adopted followed by the Pit bull and Rottweiler. Also, Siberian Husky are slightly more returned to the owner than the other dog breeds. For the cats, the domestic shorthair are less adopted but mostly transferred.
+
+
+## 2.7 Animal's Color
+For each outcome type, we want to know which animal's color has the greatest and lowest count.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+## SELECT Color1, OutcomeType, COUNT(Color1) AS Color1Count
+## FROM Animal
+## GROUP BY Color1
+## HAVING Color1Count > 150
+
+train.copy$Color1 <- strsplit(x = train.copy$Color, split = "/") %>% sapply(function(x){x[1]})
+
+colors.common <- train.copy %>% 
+                    group_by(Color1) %>%
+                    filter(n() >= 150)
+
+train.copy$Color1[!(train.copy$Color1 %in% colors.common$Color1)] <- "Others"
+
+train.copy %>% filter(AnimalType == "Dog") %>% 
+    ggplot(aes(x = Color1, fill = OutcomeType)) +
+    geom_bar(stat = "count", position = "fill", width = 0.8) + 
+    ggtitle("Dog colors by Outcome Type") +
+    coord_flip() +
+    scale_fill_brewer(palette = "Set1") +
+    theme(axis.title = element_blank())
+
+train.copy %>% filter(AnimalType == "Cat") %>% 
+    ggplot(aes(x = Color1, fill = OutcomeType)) +
+    geom_bar(stat = "count", position = "fill", width = 0.8) + 
+    ggtitle("Cat colors by Outcome Type") +
+    coord_flip() +
+    scale_fill_brewer(palette = "Set1") +
+    theme(axis.title = element_blank())
+```
+
+Yellow dogs are mostly returned to their owner and fawn ones are less adopted but mostly transferred with the cream ones. For the cats, we can see that tan cats are always adopted and tricolor cats are always transferred. Another important insight is that brown cats never died, are not euthanasied or are not returned to their owner.
+
+Some of colors have a qualifier but these should not have influance on the outcomes. We take the feature `Color1` to determine the qualifiers.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train.copy$ColorQualifier1 <- strsplit(x = train.copy$Color1, split = "\\s") %>% sapply(function(x){ifelse(length(x) > 1, x[2], "None")})
+
+train.copy %>% group_by(ColorQualifier1) %>% filter(AnimalType == "Dog") %>% 
+    ggplot(aes(x = ColorQualifier1, fill = OutcomeType)) +
+    geom_bar(stat = "count", position = "fill", width = 0.8) + 
+    ggtitle("Dog color qualifiers by Outcome Type") +
+    coord_flip() +
+    scale_fill_brewer(palette = "Set1") +
+    theme(axis.title = element_blank())
+
+train.copy %>% group_by(ColorQualifier1) %>% filter(AnimalType == "Cat") %>% 
+    ggplot(aes(x = ColorQualifier1, fill = OutcomeType)) +
+    geom_bar(stat = "count", position = "fill", width = 0.8) + 
+    ggtitle("Cat color qualifiers by Outcome Type") +
+    coord_flip() +
+    scale_fill_brewer(palette = "Set1") +
+    theme(axis.title = element_blank())
+```
+
+We can verify with the bar chart above that qualifiers has no influance on the outcomes for cats and dogs.
+
 
 
 # 3 Feature Engineering
 In this section, we add and remove features from the dataset. We also transform each feature in categories represented by a positive integer. The objective is to clean and prepare the dataset for our prediction's model and to answer the questions: `Are there features that can be split in many other features? If yes, are they improving the score? Why and how?`. The answer to those questions will be the conclusion of this section.
 
+We will look at each feature of the dataset and split them if there are more information given than what the feature's name tells. For example, the feature `SexuponOutcome` tells us more than just the sex of the animal regarding the possible values.
 
-## 3.1 Missing / Unknown Values
-All blank, space and unknown values are replaced by the value `0`. TO DO: Explain WHY??
+For each features having limited number of unique values (categories), we will number them with a positive integer starting at 0.  
 
 
-## 3.2 Removing ID and OutcomeSubtype
+## 3.1 Removing ID and OutcomeSubtype
 We remove the features `AnimalID`, `OutcomeSubtype` from the test and train sets.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
@@ -290,14 +355,23 @@ test.id <- test$ID
 test$ID <- NULL
 
 train$OutcomeSubtype <- NULL
+
+train <- data.table(train)
+test <- data.table(test)
 ```
 
 
-## 3.3 Adding Features
-The objective is to look at each feature of the dataset and split them if there are more information given than what the feature's name tells. For example, the feature `SexuponOutcome` tells us more than just the sex of the animal regarding the possible values.
+## 3.2 AnimalType Feature
+Since the animal type feature has significant influance on the outcome, we replace its possible values by 0 = Dog and 1 = Cat.
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+animal.types <- unique(c(train$AnimalType, test$AnimalType))
+train$AnimalType <- as.integer(mapvalues(train$AnimalType, from = animal.types, to = seq(0, length(animal.types) - 1)))
+test$AnimalType <- as.integer(mapvalues(test$AnimalType, from = animal.types, to = seq(0, length(animal.types) - 1)))
+```
 
 
-### 3.3.1 DateTime Feature
+## 3.3 DateTime Feature
 From the feature `DateTime` of the dataset, we extract the date and the time separately. We replace the `DateTime` feature by 2 new features named `Date` and `Time`. Those features are transformed to positive integers. From them, we can also extract other information like:
 
 * Day (integer from 0 to 29 depending on the month)
@@ -322,51 +396,78 @@ train$Year <- year(train.date) - min(years)
 train$Month <- month(train.date)
 train$Day <- day(train.date)
 train$DateInDays <- difftime(as.Date(train.date,'%Y/%m/%d'), as.Date(min(train.date),'%Y/%m/%d'), units = c("days"))
-train$Hours <- hour(train.date)
-train$Time <- train$Hours * 60 + minute(train.date)
-train$IsPm <- ifelse(train$Hours >= 12, 1, 0)
-#train.birthday <- train.date - days(train$AgeuponOutcome)
-#train$Birthday <- difftime(as.Date(train.birthday,'%Y/%m/%d'), as.Date(min(train.birthday),'%Y/%m/%d'), units = c("days"))
+train$Hour <- hour(train.date)
+train$Time <- train$Hour * 60 + minute(train.date)
+train$IsPm <- ifelse(train$Hour >= 11 & train$Hour <= 19, 1, 0)
+
 
 test$Year <- year(test.date) - min(years)
 test$Month <- month(test.date)
 test$Day <- day(test.date)
 test$DateInDays <- difftime(as.Date(test.date,'%Y/%m/%d'), as.Date(min(test.date),'%Y/%m/%d'), units = c("days"))
-test$Hours <- hour(test.date)
-test$Time <- test$Hours * 60 + minute(test.date)
-test$IsPm <- ifelse(test$Hours >= 12, 1, 0)
-#test.birthday <- test.date - days(test$AgeuponOutcome)
-#test$Birthday <- difftime(as.Date(test.birthday,'%Y/%m/%d'), as.Date(min(test.birthday),'%Y/%m/%d'), units = c("days"))
+test$Hour <- hour(test.date)
+test$Time <- test$Hour * 60 + minute(test.date)
+test$IsPm <- ifelse(test$Hour >= 11 & test$Hour <= 19, 1, 0)
 
 train$DateTime <- NULL
 test$DateTime <- NULL
 ```
 
 
-### 3.3.2 AgeuponOutcome Feature
+## 3.4 AgeuponOutcome Feature
+We transform the feature `AgeuponOutcome` to integer values. For example, the age should be counted in days. Thus, `2 year` should be replaced by the value 2 * 365 = 730. For months, the formula should be `age * 30`. For weeks, the formula should be `age * 7`. Finally, for years, the formula should be `age * 365`. This is much easier to understand, but since the age is used as "categories" in the dataset, we will start with:
+
+* 0 years or blank = 0
+* 1 day = 1 through 6 days = 6
+* 1 week = 7 through 4 weeks = 10
+* 1 month = 11 through 11 months = 21
+* 1 year = 22 through 20 years = 41
+
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+## Get the list of integer extracted from the feature AgeuponOutcome.
+train.age <- as.integer(regmatches(train$AgeuponOutcome, regexpr("[[:digit:]]+", train$AgeuponOutcome)))
+test.age <- as.integer(regmatches(test$AgeuponOutcome, regexpr("[[:digit:]]+", test$AgeuponOutcome)))
+
+## Get row index list where AgeuponOutcome contains "year", "month", "week" or "day".
+## Get the correspondant integer from each row index and apply the formula to get all ages in years.
+train.year.list <- grep("year", train$AgeuponOutcome)
+train$AgeuponOutcome[train.year.list] <- train.age[train.year.list] + 21 #* 365
+train.month.list <- grep("month", train$AgeuponOutcome)
+train$AgeuponOutcome[train.month.list] <- train.age[train.month.list] + 10 #* 30
+train.week.list <- grep("week", train$AgeuponOutcome)
+train$AgeuponOutcome[train.week.list] <- train.age[train.week.list] + 6 #* 7
+train.day.list <- grep("day", train$AgeuponOutcome)
+train$AgeuponOutcome[train.day.list] <- train.age[train.day.list]
+
+test.year.list <- grep("year", test$AgeuponOutcome)
+test$AgeuponOutcome[test.year.list] <- test.age[test.year.list] + 21 #* 365
+test.month.list <- grep("month", test$AgeuponOutcome)
+test$AgeuponOutcome[test.month.list] <- test.age[test.month.list] + 10 #* 30
+test.week.list <- grep("week", test$AgeuponOutcome)
+test$AgeuponOutcome[test.week.list] <- test.age[test.week.list] + 6 #* 7
+test.day.list <- grep("day", test$AgeuponOutcome)
+test$AgeuponOutcome[test.day.list] <- test.age[test.day.list]
+
+train$AgeuponOutcome <- as.integer(train$AgeuponOutcome)
+test$AgeuponOutcome <- as.integer(test$AgeuponOutcome)
+```
+
 We have seen that age of animals separated in 3 categories has influance on outcomes.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-train$AgeGroup <- train$AgeuponOutcome
-train$AgeGroup[train$AgeuponOutcome <= 30] <- 0
-train$AgeGroup[train$AgeuponOutcome <= 365 & train$AgeuponOutcome > 30] <- 1
-train$AgeGroup[train$AgeuponOutcome > 365] <- 2
+train$AgeGroup <- 0
+train$AgeGroup[train$AgeuponOutcome > 10 & train$AgeuponOutcome <= 21] <- 1
+train$AgeGroup[train$AgeuponOutcome > 21 & train$AgeuponOutcome <= 31] <- 2
+train$AgeGroup[train$AgeuponOutcome > 31] <- 3
 
-test$AgeGroup <- test$AgeuponOutcome
-test$AgeGroup[test$AgeuponOutcome <= 30] <- 0
-test$AgeGroup[test$AgeuponOutcome <= 365 & test$AgeuponOutcome > 30] <- 1
-test$AgeGroup[test$AgeuponOutcome > 365] <- 2
-
-
-# train$AgeInYears <- train$AgeuponOutcome / 365
-# train$AgeInYears[train$AgeuponOutcome < 1] <- 0
-# 
-# test$AgeInYears <- test$AgeuponOutcome / 365
-# test$AgeInYears[test$AgeuponOutcome < 1] <- 0
+test$AgeGroup <- 0
+test$AgeGroup[test$AgeuponOutcome > 10 & test$AgeuponOutcome <= 21] <- 1
+test$AgeGroup[test$AgeuponOutcome > 21 & test$AgeuponOutcome <= 31] <- 2
+test$AgeGroup[test$AgeuponOutcome > 31] <- 3
 ```
 
 
-### 3.3.3 SexuponOutcome Feature
+## 3.5 SexuponOutcome Feature
 This feature contains information on the sex of the animal and if the animal is sterile or intact. Thus, we create two features named `Sex` and `Sterility` that will replace the feature `SexuponOutcome`.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
@@ -385,13 +486,13 @@ test$Sex[test.sex.female.list] <- 2
 
 train.sex.intacts <- grep("Intact", train$SexuponOutcome)
 train.sex.steriles <- c(grep("Spayed", train$SexuponOutcome), grep("Neutered", train$SexuponOutcome))
-train$Sterility <- rep(0, length(train$SexuponOutcome))
+train$Sterility <- 0
 train$Sterility[train.sex.intacts] <- 1
 train$Sterility[train.sex.steriles] <- 2
 
 test.sex.intacts <- grep("Intact", test$SexuponOutcome)
 test.sex.steriles <- c(grep("Spayed", test$SexuponOutcome), grep("Neutered", test$SexuponOutcome))
-test$Sterility <- rep(0, length(test$SexuponOutcome))
+test$Sterility <- 0
 test$Sterility[test.sex.intacts] <- 1
 test$Sterility[test.sex.steriles] <- 2
 
@@ -400,7 +501,7 @@ test$SexuponOutcome <- NULL
 ```
 
 
-### 3.3.4 Breed Feature
+## 3.6 Breed Feature
 For each animal, we verify if it is a mixed breed, a purebred or a crossed breed. We extract this information from the `Breed` feature and add a new feature `BreedType` where all purebred animals are identified with the value 2 per the code book. The mixed breed are identified with the value 0 and crossed breed with value 1.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
@@ -439,13 +540,11 @@ We want to get all possible breeds from the dataset. To process that, we will re
 # test.breed2[indices] <- gsub(" Mix|.*/", "", test$Breed[indices])
 # test$Breed2 <- GetIntegerFeatureFromGroups(test.breed2, test.breeds)
 
-## Get Cat Breed
-#cat.breed <- unique(train$Breed[train$AnimalType == "Cat"])
 
-## New feature 'HairType' where Shorthair = 1, Longhair = 2, Wirehair = 3, Medium Hair = 4, otherwise = 0
+## New feature 'HairType' where Shorthair = 0, Longhair = 1, Wirehair = 2, Medium Hair = 3
 hair.type <- c("Shorthair", "Longhair", "Wirehair", "Medium Hair")
-train$HairType <- GetIntegerFeatureFromGroups(train$Breed, hair.type)
-test$HairType <- GetIntegerFeatureFromGroups(test$Breed, hair.type)
+train$HairType <- GetIntegerFeatureFromGroups(train$Breed, hair.type) - 1
+test$HairType <- GetIntegerFeatureFromGroups(test$Breed, hair.type) - 1
 
 ## New feature 'IsDomestic' where Domestic = 1 otherwise = 0
 train$IsDomestic <- GetBooleanFeatureFromGroup(train$Breed, "Domestic")
@@ -459,31 +558,20 @@ test$IsMiniature <- GetBooleanFeatureFromGroup(test$Breed, "Miniature")
 train$IsPitbull <- GetBooleanFeatureFromGroup(train$Breed, "Pit Bull")
 test$IsPitbull <- GetBooleanFeatureFromGroup(test$Breed, "Pit Bull")
 
-## New feature 'IsHound' where Hound = 1 otherwise = 0
-#train$IsHound <- GetBooleanFeatureFromGroup(train$Breed, "Hound")
-#test$IsHound <- GetBooleanFeatureFromGroup(test$Breed, "Hound")
+## New feature 'IsShihTzu' where Shih Tzu = 1 otherwise = 0
+train$IsShihTzu <- GetBooleanFeatureFromGroup(train$Breed, "Shih Tzu")
+test$IsShihTzu <- GetBooleanFeatureFromGroup(test$Breed, "Shih Tzu")
 
-## New feature 'IsLabrador' where Labrador Retriever = 1 otherwise = 0
-#train$IsLabrador <- GetBooleanFeatureFromGroup(train$Breed, "Labrador")
-#test$IsLabrador <- GetBooleanFeatureFromGroup(test$Breed, "Labrador")
-
-## New feature 'IsChihuahua' where Chihuahua = 1 otherwise = 0
-#train$IsChihuahua <- GetBooleanFeatureFromGroup(train$Breed, "Chihuahua")
-#test$IsChihuahua <- GetBooleanFeatureFromGroup(test$Breed, "Chihuahua")
-
-## New feature 'IsTerrier' where Terrier = 1 otherwise = 0
-#train$IsTerrier <- GetBooleanFeatureFromGroup(train$Breed, "Terrier")
-#test$IsTerrier <- GetBooleanFeatureFromGroup(test$Breed, "Terrier")
-
-#train$IsShepherd <- GetBooleanFeatureFromGroup(train$Breed, "Shepherd")
-#test$IsShepherd <- GetBooleanFeatureFromGroup(test$Breed, "Shepherd")
+## New feature 'IsRottweiler' where Rottweiler = 1 otherwise = 0
+# train$IsRottweiler <- GetBooleanFeatureFromGroup(train$Breed, "Siberian Husky")
+# test$IsRottweiler <- GetBooleanFeatureFromGroup(test$Breed, "Siberian Husky")
 
 train$Breed <- NULL
 test$Breed <- NULL
 ```
 
 
-### 3.3.5 Colors
+## 3.7 Colors
 With the color feature, we can extract the number of colors. If we find a slash `/` character which we define as a `separator`, then we have 2 colors. If we find `Tricolor`, then this means that we have 3 colors. 
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
@@ -496,68 +584,75 @@ test$NumberOfColors <- str_count(test$Color, "/") + 1
 test$NumberOfColors[test.tricolor] <- 3
 ```
 
-As we have seen previously, we know that if there is a separator, then we have 2 colors. Thus, we can split the feature `Color` in 2 features: `Color1` and `Color2`. To get `Color1`, we will take all strings without the separator or the left side of the string if a separator is found. For `Color2`, we will take the right side of all strings containing the separator. Those features will be converted as a positive integer where each represents a specific color. `Color2` is 0 if and only if there is no separator.
+<!--As we have seen previously, we know that if there is a separator, then we have 2 colors. Thus, we can split the feature `Color` in 2 features: `Color1` and `Color2`. To get `Color1`, we will take all strings without the separator or the left side of the string if a separator is found. For `Color2`, we will take the right side of all strings containing the separator. Those features will be converted as a positive integer where each represents a specific color. `Color2` is 0 if and only if there is no separator.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-train.colors <- unique(c(gsub(".*/", "", train$Color), gsub("/.*", "", train$Color)))
-train.colors.list <- unique(gsub(" .*$", "", train.colors))
-indices <- grep("/", train$Color)
+# train.colors <- unique(c(gsub(".*/", "", train$Color), gsub("/.*", "", train$Color)))
+# train.colors.list <- unique(gsub(" .*$", "", train.colors))
+# indices <- grep("/", train$Color)
+# 
+# train.color1 <- gsub("/.*", "", train$Color)
+# train$Color1 <- GetIntegerFeatureFromGroups(train.color1, train.colors.list)
+# 
+# train.color2 <- rep("", length(train$Color))
+# train.color2[indices] <- gsub(".*/", "", train$Color[indices])
+# train$Color2 <- GetIntegerFeatureFromGroups(train.color2, train.colors.list)
+# 
+# 
+# test.colors <- unique(c(gsub(".*/", "", test$Color), gsub("/.*", "", test$Color)))
+# test.colors.list <- unique(gsub(" .*$", "", test.colors))
+# indices <- grep("/", test$Color)
+# 
+# test.color1 <- gsub("/.*", "", test$Color)
+# test$Color1 <- GetIntegerFeatureFromGroups(test.color1, test.colors.list)
+# 
+# test.color2 <- rep("", length(test$Color))
+# test.color2[indices] <- gsub(".*/", "", test$Color[indices])
+# test$Color2 <- GetIntegerFeatureFromGroups(test.color2, test.colors.list)
+```
+-->
+From the bar plots shown for animals color, we add binary features for the following colors (Tan, Tricolor, Brown, Buff, Yellow, Sable). They are special cases where colors have a high or low percentage for some outcomes.
 
-train.color1 <- gsub("/.*", "", train$Color)
-train$Color1 <- GetIntegerFeatureFromGroups(train.color1, train.colors.list)
+```{r echo = TRUE, message = FALSE, warning = FALSE}
+train$IsTan <- ifelse(train$Color == "Tan" & train$AnimalType == 1, 1, 0)
+test$IsTan <- ifelse(test$Color == "Tan" & test$AnimalType == 1, 1, 0)
 
-train.color2 <- rep("", length(train$Color))
-train.color2[indices] <- gsub(".*/", "", train$Color[indices])
-train$Color2 <- GetIntegerFeatureFromGroups(train.color2, train.colors.list)
+train$IsTricolor <- ifelse(train$Color == "Tricolor" & train$AnimalType == 1, 1, 0)
+test$IsTricolor <- ifelse(test$Color == "Tricolor" & test$AnimalType == 1, 1, 0)
 
+train$IsBrown <- ifelse(train$Color == "Brown" & train$AnimalType == 1, 1, 0)
+test$IsBrown <- ifelse(test$Color == "Brown" & test$AnimalType == 1, 1, 0)
 
-test.colors <- unique(c(gsub(".*/", "", test$Color), gsub("/.*", "", test$Color)))
-test.colors.list <- unique(gsub(" .*$", "", test.colors))
-indices <- grep("/", test$Color)
+train$IsBuff <- ifelse(train$Color == "Buff" & train$AnimalType == 1, 1, 0)
+test$IsBuff <- ifelse(test$Color == "Buff" & test$AnimalType == 1, 1, 0)
 
-test.color1 <- gsub("/.*", "", test$Color)
-test$Color1 <- GetIntegerFeatureFromGroups(test.color1, test.colors.list)
+#train$IsCream <- ifelse(train$Color == "Cream" & train$AnimalType == 1, 1, 0)
+#test$IsCream <- ifelse(test$Color == "Cream" & test$AnimalType == 1, 1, 0)
 
-test.color2 <- rep("", length(test$Color))
-test.color2[indices] <- gsub(".*/", "", test$Color[indices])
-test$Color2 <- GetIntegerFeatureFromGroups(test.color2, test.colors.list)
+train$IsYellow <- ifelse(train$Color == "Yellow" & train$AnimalType == 0, 1, 0)
+test$IsYellow <- ifelse(test$Color == "Yellow" & test$AnimalType == 0, 1, 0)
+
+train$IsSable <- ifelse(train$Color == "Sable" & train$AnimalType == 0, 1, 0)
+test$IsSable <- ifelse(test$Color == "Sable" & test$AnimalType == 0, 1, 0)
 
 train$Color <- NULL
 test$Color <- NULL
 ```
 
-We can extract qualifier of colors for every color containing a space character which we define as the qualifier separator. Since we have 2 features for the colors, we will have 2 features for qualifier as well. We name these features `ColorQualifier1` and `ColorQualifier2` which are associated to `Color1` and `Color2` respectively. These 2 features are set to 0 if there is no qualifier.
+
+## 3.8 Name Feature
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-colors.indices <- grep(" ", train.colors)
-train.qualifiers <- unique(gsub(".* ", "", train.colors[colors.indices]))
+train$Name[str_length(train$Name) == 1] <- 0
+train$Name[str_length(train$Name) > 1] <- 1
 
-indices <- grep(" ", train.color1)
-train$ColorQualifier1 <- rep("", length(train.color1))
-train$ColorQualifier1[indices] <- gsub(".* ", "", train.color1[indices])
-train$ColorQualifier1 <- GetIntegerFeatureFromGroups(train$ColorQualifier1, train.qualifiers)
+test$Name[str_length(test$Name) == 1] <- 0
+test$Name[str_length(test$Name) > 1] <- 1
 
-# indices <- grep(" ", train.color2)
-# train$ColorQualifier2 <- rep("", length(train.color2))
-# train$ColorQualifier2[indices] <- gsub(".* ", "", train.color2[indices])
-# train$ColorQualifier2 <- GetIntegerFeatureFromGroups(train$ColorQualifier2, train.qualifiers)
-
-
-colors.indices <- grep(" ", test.colors)
-test.qualifiers <- unique(gsub(".* ", "", test.colors[colors.indices]))
-
-indices <- grep(" ", test.color1)
-test$ColorQualifier1 <- rep("", length(test.color1))
-test$ColorQualifier1[indices] <- gsub(".* ", "", test.color1[indices])
-test$ColorQualifier1 <- GetIntegerFeatureFromGroups(test$ColorQualifier1, test.qualifiers)
-
-# indices <- grep(" ", test.color2)
-# test$ColorQualifier2 <- rep("", length(test.color2))
-# test$ColorQualifier2[indices] <- gsub(".* ", "", test.color2[indices])
-# test$ColorQualifier2 <- GetIntegerFeatureFromGroups(test$ColorQualifier2, test.qualifiers)
+#train$NameLength <- ifelse(train$Name == 0, 0, str_length(train$Name))
+#test$NameLength <- ifelse(test$Name == 0, 0, str_length(test$Name))
 ```
 
-Since the second qualifier is not usefull, we removed it from the train and test sets.
 
 
 # 4 Training Model
@@ -570,16 +665,17 @@ We prepare the parameters and matrices for the cross-validation and final predic
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
 outcomes.string <- sort(unique(train$OutcomeType))
 indices <- order(unique(train$OutcomeType))
-outcome.type <- CategoryToInteger(train$OutcomeType) - 1
+outcome.type <- as.integer(mapvalues(train$OutcomeType, from = outcomes.string, to = seq(0, length(outcomes.string) - 1)))
 train$OutcomeType <- NULL
 
 outcome.class.num <- length(outcomes.string)
 param <- list(objective        = "multi:softprob",
               num_class        = outcome.class.num,    # number of classes
-              eta              = 0.085,      # Control the learning rate
+              eta              = 0.05,      # Control the learning rate
               subsample        = 0.75,     # Subsample ratio of the training instance
-              max_depth        = 8,        # Maximum depth of the tree
-              colsample_bytree = 0.85,     # Subsample ratio of columns when constructing each tree
+              max_depth        = 9,        # Maximum depth of the tree
+              colsample_bytree = 0.8,     # Subsample ratio of columns when constructing each tree
+              maximize         = TRUE,
               eval_metric      = "mlogloss")
 ```
 
@@ -590,7 +686,7 @@ We do a cross-validation to get the optimal number of trees and multi-class log-
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 ## Cross-Validation
 cv.nfolds <- 10
-cv.nrounds <- 250
+cv.nrounds <- 350
 
 train.matrix <- xgb.DMatrix(data.matrix(train), label = outcome.type)
 model.cv <- xgb.cv(data     = train.matrix, 
@@ -610,7 +706,6 @@ print(ggplot(model.cv, aes(x = names, y = test.mlogloss.mean)) +
 print(model.cv)
 best <- model.cv[model.cv$test.mlogloss.mean == min(model.cv$test.mlogloss.mean), ]
 cat("\nOptimal testing set Log-Loss score:", best$test.mlogloss.mean)
-cat("\nApprox. Kaggle Log-Loss score:", best$test.mlogloss.mean - (best$test.mlogloss.std / 2))
 cat("\nInterval testing set Log-Loss score: [", best$test.mlogloss.mean - best$test.mlogloss.std, ", ", best$test.mlogloss.mean + best$test.mlogloss.std, "].")
 cat("\nDifference between optimal training and testing sets Log-Loss:", best$train.mlogloss.mean - best$test.mlogloss.mean)
 cat("\nOptimal number of trees:", best$names)
@@ -672,3 +767,7 @@ colnames(prediction.test) <- outcomes.string
 submission <- cbind(data.frame(ID = test.id), prediction.test)
 write.csv(submission, "Submission.csv", row.names = FALSE)
 ```
+
+
+# 5 Conclusion
+In this section, we present our predictions for each outcome type.
