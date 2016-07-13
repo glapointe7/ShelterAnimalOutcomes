@@ -3,25 +3,25 @@ library(stringr)
 library(xgboost)
 library(methods)
 library(Matrix)
+library(gridExtra)
 library(ggplot2)
 library(scales)
 library(data.table)
-#library(plotrix)
 library(plyr)
 library(dplyr)
 library(MLmetrics)
 library(Ckmeans.1d.dp)
 
 
-# CategoryToInteger <- function(feature)
-# {
-#     feature.categories <- unique(feature)
-#     feature.categories.id <- 1:length(feature.categories)
-#     names(feature.categories.id) <- as.vector(feature.categories)
-#     feature <- feature.categories.id[feature]
-#     
-#     return(feature)
-# }
+CategoryToInteger <- function(feature)
+{
+    feature.categories <- unique(feature)
+    feature.categories.id <- 1:length(feature.categories)
+    names(feature.categories.id) <- as.vector(feature.categories)
+    feature <- feature.categories.id[feature]
+    
+    return(feature)
+}
 
 
 GetBooleanFeatureFromGroup <- function(feature, group)
@@ -48,7 +48,7 @@ GetIntegerFeatureFromGroups <- function(feature, groups)
     return(feature.group)
 }
 
-## 
+# 
 # CreateDataframeFromThreshold <- function(prediction, threshold)
 # {
 #     prediction.ncol <- ncol(prediction)

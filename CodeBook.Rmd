@@ -6,7 +6,7 @@ output: html_document
 ---
 
 # 1 Dataset
-The dataset contains 2 files: train.csv and test.csv. 
+The dataset contains 2 files: train.csv (2.8 Mb) and test.csv (1.0 Mb). 
 
 * The train set contains 26729 observations (animals) and 10 features. 
 * The test set contains 11456 observations (animals) and 8 features.
