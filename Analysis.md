@@ -6,8 +6,6 @@ output:
   html_document:
     number_sections: yes
     toc: yes
-  pdf_document:
-    toc: yes
 variant: markdown_github
 ---
 
@@ -185,7 +183,7 @@ The feature `Name` is transformed to a boolean value where the value is 0 when t
 
 ![plot of chunk unnamed-chunk-7](figure/unnamed-chunk-7-1.png)
 
-From the bar chart, we can see that the name length follow the normal distribution if we exclude length of 0. Animals having no name are mostly transfered but for cats, this is very significant. Transferred cats having no name represent 0 % of the train set and 35.2501029 % of all the transferred animals of the train set. This is clearly an insight to consider. Therefore, we transform string values of the `Name` feature in boolean values telling if the animal has a name = 1 or has no name = 0.
+From the bar chart, we can see that the name length follow the normal distribution if we exclude length of 0. Animals having no name are mostly transfered but for cats, this is very significant. Transferred cats having no name represent 13.7790415 % of the train set and 35.2501029 % of all the transferred animals of the train set. This is clearly an insight to consider. Therefore, we transform string values of the `Name` feature in boolean values telling if the animal has a name = 1 or has no name = 0.
 
 
 ```r
@@ -199,7 +197,7 @@ We want to see if extracting information that check if the animal is sterile or 
 
 ![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9-1.png)
 
-We can see that sterile animals are mostly adopted which confirms our hypothesis. Unknown or intact animals are mostly transferred. This makes sense with unknown ones since they may need to be transferred to the clinic to identify clearly their sex and if they are sterile or not. Note that animals that we do not know if they are sterile or not (Unknown) are not adopted. Thus, knowing if the animal is sterile or not has influance on the outcomes.
+We can see that sterile animals are mostly adopted which confirms our hypothesis. Unknown or intact animals are mostly transferred. This makes sense with unknown ones since they may need to be transferred to the clinic to identify clearly their sex and if they are sterile or not. Note that animals that we do not have information on their sterility and sex are not adopted. Thus, knowing if the animal is sterile or not has influance on the outcomes.
 
 From this bar chart, we distinguish 3 groups: Unknown, Intact (not neutered or not spayed), Sterile (neutered or spayed).
 
@@ -258,7 +256,6 @@ From the feature `DateTime` of the dataset, we extract many useful features. Tho
 * Day: integer from 1 to 31 depending on the month
 * Month: integer from 1 to 12
 * Year: integer from 2013 to 2016
-* Hour: integer from 0 to 23
 * Weekday: integer from 0 to 6 which represent Sunday to Saturday
 * DateInDays: Number of days from the oldest date of the dataset
 * Time: The time represented by the equation $60h + m$ where $h$ is the hours and $m$ the minutes.
@@ -270,18 +267,19 @@ test$Weekday <- as.POSIXlt(test$DateTime)$wday
 
 train.date <- ymd_hms(train$DateTime)
 test.date <- ymd_hms(test$DateTime)
-#years <- unique(c(year(train.date), year(test.date)))
 
 ## The year starts at 0 which is the minimum year of the dataset.
 train$Year <- year(train.date)
 train$Month <- month(train.date)
 train$Day <- day(train.date)
+train$Hour <- hour(train.date)
 train$DateInDays <- difftime(as.Date(train.date,'%Y/%m/%d'), as.Date(min(train.date),'%Y/%m/%d'), units = c("days"))
 train$Time <- hour(train.date) * 60 + minute(train.date)
 
 test$Year <- year(test.date)
 test$Month <- month(test.date)
 test$Day <- day(test.date)
+test$Hour <- hour(test.date)
 test$DateInDays <- difftime(as.Date(test.date,'%Y/%m/%d'), as.Date(min(test.date),'%Y/%m/%d'), units = c("days"))
 test$Time <- hour(test.date) * 60 + minute(test.date)
 
@@ -342,41 +340,21 @@ test$BreedType[test.breed.cross.list] <- 1
 test$BreedType[test.breed.mix.list] <- 0
 ```
 
+Special cases with Pit Bull, Shih Tzu and Pug are considered since they are less adopted than the others.
 
 
 ```r
 breeds <- c("Pit Bull", "Shih Tzu", "Pug")
-train$CommonBreeds <- GetIntegerFeatureFromGroups(train$Breed, breeds) - 1
-test$CommonBreeds <- GetIntegerFeatureFromGroups(test$Breed, breeds) - 1
+train$CommonBreeds <- GetIntegerFeatureFromGroups(train$Breed, breeds)
+test$CommonBreeds <- GetIntegerFeatureFromGroups(test$Breed, breeds)
 
 ## New feature 'HairType' where Shorthair = 0, Longhair = 1, Wirehair = 2, Medium Hair = 3
 #hair.type <- c("Shorthair", "Longhair", "Wirehair", "Medium Hair")
-#train$HairType <- as.integer(mapvalues(train$Breed, from = hair.type, to = seq(0, length(hair.type) - 1)))
-#test$HairType <- as.integer(mapvalues(test$Breed, from = hair.type, to = seq(0, length(hair.type) - 1)))
 #train$HairType <- GetIntegerFeatureFromGroups(train$Breed, hair.type) - 1
 #test$HairType <- GetIntegerFeatureFromGroups(test$Breed, hair.type) - 1
 
 # train$IsShorthair <- GetBooleanFeatureFromGroup(train$Breed, "Shorthair")
 # test$IsShorthair <- GetBooleanFeatureFromGroup(test$Breed, "Shorthair")
-# 
-# ## New feature 'IsDomestic' where Domestic = 1 otherwise = 0
-# train$IsDomestic <- GetBooleanFeatureFromGroup(train$Breed, "Domestic")
-# test$IsDomestic <- GetBooleanFeatureFromGroup(test$Breed, "Domestic")
-# 
-# ## New feature 'IsMiniature' where Miniature = 1 otherwise = 0
-# train$IsMiniature <- GetBooleanFeatureFromGroup(train$Breed, "Miniature")
-# test$IsMiniature <- GetBooleanFeatureFromGroup(test$Breed, "Miniature")
-# 
-# ## New feature 'IsPitbull' where Pit Bull = 1 otherwise = 0
-# train$IsPitbull <- GetBooleanFeatureFromGroup(train$Breed, "Pit Bull")
-# test$IsPitbull <- GetBooleanFeatureFromGroup(test$Breed, "Pit Bull")
-# 
-# ## New feature 'IsShihTzu' where Shih Tzu = 1 otherwise = 0
-# train$IsShihTzu <- GetBooleanFeatureFromGroup(train$Breed, "Shih Tzu")
-# test$IsShihTzu <- GetBooleanFeatureFromGroup(test$Breed, "Shih Tzu")
-# 
-# train$IsLabrador <- GetBooleanFeatureFromGroup(train$Breed, "Labrador Retriever")
-# test$IsLabrador <- GetBooleanFeatureFromGroup(test$Breed, "Labrador Retriever")
 
 train$Breed <- NULL
 test$Breed <- NULL
@@ -401,80 +379,6 @@ With the color feature, we can extract the number of colors. If we find a slash 
 ![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-1.png)
 
 
-```r
-train$NumberOfColors <- train.copy$NumberOfColors
-
-test$NumberOfColors <- str_count(test$Color, "/") + 1
-test$NumberOfColors[grep("Tricolor", test$Color)] <- 3
-```
-
-<!--As we have seen previously, we know that if there is a separator, then we have 2 colors. Thus, we can split the feature `Color` in 2 features: `Color1` and `Color2`. To get `Color1`, we will take all strings without the separator or the left side of the string if a separator is found. For `Color2`, we will take the right side of all strings containing the separator. Those features will be converted as a positive integer where each represents a specific color. `Color2` is 0 if and only if there is no separator.
-
-
-```r
-# train.colors <- unique(c(gsub(".*/", "", train$Color), gsub("/.*", "", train$Color)))
-# train.colors.list <- unique(gsub(" .*$", "", train.colors))
-# indices <- grep("/", train$Color)
-# 
-# train.color1 <- gsub("/.*", "", train$Color)
-# train$Color1 <- GetIntegerFeatureFromGroups(train.color1, train.colors.list)
-# 
-# train.color2 <- rep("", length(train$Color))
-# train.color2[indices] <- gsub(".*/", "", train$Color[indices])
-# train$Color2 <- GetIntegerFeatureFromGroups(train.color2, train.colors.list)
-# 
-# 
-# test.colors <- unique(c(gsub(".*/", "", test$Color), gsub("/.*", "", test$Color)))
-# test.colors.list <- unique(gsub(" .*$", "", test.colors))
-# indices <- grep("/", test$Color)
-# 
-# test.color1 <- gsub("/.*", "", test$Color)
-# test$Color1 <- GetIntegerFeatureFromGroups(test.color1, test.colors.list)
-# 
-# test.color2 <- rep("", length(test$Color))
-# test.color2[indices] <- gsub(".*/", "", test$Color[indices])
-# test$Color2 <- GetIntegerFeatureFromGroups(test.color2, test.colors.list)
-```
-
-From the bar plots shown for animals color, we add binary features for the following colors (Tan, Tricolor, Brown, Buff, Yellow, Sable). They are special cases where colors have a high or low percentage of outcomes.
-
-
-```r
-## Cats
-#colors <- c("Tan", "Tricolor", "Brown", "Buff")
-#train$Color <- GetIntegerFeatureFromGroups(train$Color, colors) - 1
-#test$Color <- GetIntegerFeatureFromGroups(test$Color, colors) - 1
-
-# train$IsTan <- ifelse(train$Color == "Tan" & train$AnimalType == 1, 1, 0)
-# test$IsTan <- ifelse(test$Color == "Tan" & test$AnimalType == 1, 1, 0)
-# 
-# train$IsTricolor <- ifelse(train$Color == "Tricolor" & train$AnimalType == 1, 1, 0)
-# test$IsTricolor <- ifelse(test$Color == "Tricolor" & test$AnimalType == 1, 1, 0)
-# 
-# train$IsBrown <- ifelse(train$Color == "Brown" & train$AnimalType == 1, 1, 0)
-# test$IsBrown <- ifelse(test$Color == "Brown" & test$AnimalType == 1, 1, 0)
-# 
-# train$IsBuff <- ifelse(train$Color == "Buff" & train$AnimalType == 1, 1, 0)
-# test$IsBuff <- ifelse(test$Color == "Buff" & test$AnimalType == 1, 1, 0)
-# 
-# ## Dogs
-# train$IsYellow <- ifelse(train$Color == "Yellow" & train$AnimalType == 0, 1, 0)
-# test$IsYellow <- ifelse(test$Color == "Yellow" & test$AnimalType == 0, 1, 0)
-# 
-# train$IsSable <- ifelse(train$Color == "Sable" & train$AnimalType == 0, 1, 0)
-# test$IsSable <- ifelse(test$Color == "Sable" & test$AnimalType == 0, 1, 0)
-# 
-#train$IsBlack <- ifelse(train$Color == "Black", 1, 0)
-#test$IsBlack <- ifelse(test$Color == "Black", 1, 0)
-# 
-# train$IsTabby <- ifelse(grepl("Tabby", train$Color), 1, 0)
-# test$IsTabby <- ifelse(grepl("Tabby", test$Color), 1, 0)
-
-train$Color <- NULL
-test$Color <- NULL
-```
--->
-
 
 <!----------------------------------------------------------------------TRAINING MODEL--------------------------------------------------------------------------->
 
@@ -495,7 +399,6 @@ We use the `subsample` parameter which is the subsample ratio of the training in
 ```r
 outcomes.string <- sort(unique(train$OutcomeType))
 outcome.type <- CategoryToInteger(train$OutcomeType) - 1
-#as.integer(mapvalues(train$OutcomeType, from = outcomes.string, to = seq(0, length(outcomes.string) - 1)))
 indices <- order(unique(train$OutcomeType))
 
 train$OutcomeSubtype <- NULL
@@ -519,58 +422,58 @@ For each tree, we will have the average of 10 error estimates to obtain a more r
 
 We also display 2 curves indicating the test and train multi-Logloss mean progression. The vertical dotted line is the optimal number of trees. This plot shows if the model overfit or underfit.
 
-![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-1.png)
+![plot of chunk unnamed-chunk-27](figure/unnamed-chunk-27-1.png)
 
 ```
 ##      train.mlogloss.mean train.mlogloss.std test.mlogloss.mean
-##   1:            1.445606           0.006627           1.452851
-##   2:            1.323763           0.010100           1.337157
-##   3:            1.225297           0.009931           1.244830
-##   4:            1.145147           0.009201           1.170287
-##   5:            1.078355           0.008393           1.108976
+##   1:            1.443285           0.004833           1.450210
+##   2:            1.319164           0.003541           1.332229
+##   3:            1.220161           0.002784           1.239773
+##   4:            1.141034           0.004172           1.166069
+##   5:            1.074804           0.005655           1.105386
 ##  ---                                                          
-## 226:            0.224460           0.002498           0.734191
-## 227:            0.223530           0.002466           0.734414
-## 228:            0.222557           0.002429           0.734792
-## 229:            0.221623           0.002432           0.734985
-## 230:            0.220613           0.002405           0.735238
+## 226:            0.221804           0.001541           0.733730
+## 227:            0.220855           0.001499           0.733972
+## 228:            0.219824           0.001538           0.734304
+## 229:            0.218914           0.001527           0.734533
+## 230:            0.217975           0.001558           0.734792
 ##      test.mlogloss.std names
-##   1:          0.006998     1
-##   2:          0.011214     2
-##   3:          0.011855     3
-##   4:          0.012830     4
-##   5:          0.012689     5
+##   1:          0.005901     1
+##   2:          0.005278     2
+##   3:          0.005692     3
+##   4:          0.006333     4
+##   5:          0.006954     5
 ##  ---                        
-## 226:          0.018677   226
-## 227:          0.018658   227
-## 228:          0.018806   228
-## 229:          0.018825   229
-## 230:          0.018946   230
+## 226:          0.021884   226
+## 227:          0.021728   227
+## 228:          0.021812   228
+## 229:          0.021735   229
+## 230:          0.021677   230
 ```
 
 ```
 ## 
-## Optimal testing set Log-Loss score: 0.71151
+## Optimal testing set Log-Loss score: 0.711648
 ```
 
 ```
 ## 
-## Associated training set Log-Loss score: 0.407947
+## Associated training set Log-Loss score: 0.411467
 ```
 
 ```
 ## 
-## Interval testing set Log-Loss score: [ 0.695218 ,  0.727802 ].
+## Interval testing set Log-Loss score: [ 0.695559 ,  0.727737 ].
 ```
 
 ```
 ## 
-## Difference between optimal training and testing sets Log-Loss: -0.303563
+## Difference between optimal training and testing sets Log-Loss: -0.300181
 ```
 
 ```
 ## 
-## Optimal number of trees: 100
+## Optimal number of trees: 98
 ```
 
 
@@ -579,23 +482,24 @@ We proceed to the predictions of the test set and show the features importance.
 
 
 ```
-##            Feature        Gain       Cover  Frequence
-##  1:           Time 0.210782117 0.283547343 0.25857959
-##  2:      Sterility 0.208588164 0.057716174 0.01914564
-##  3: AgeuponOutcome 0.193822465 0.162751733 0.12003859
-##  4:     DateInDays 0.109525121 0.225662584 0.19327254
-##  5:           Name 0.057803403 0.033520009 0.01753755
-##  6:            Day 0.055949897 0.072691419 0.12580877
-##  7:        Weekday 0.054672408 0.049137660 0.09542548
-##  8:     AnimalType 0.035496911 0.024913902 0.02281585
-##  9:          Month 0.030414556 0.028569667 0.06532597
-## 10:   CommonBreeds 0.016228447 0.027596982 0.02060237
-## 11:      BreedType 0.011819463 0.019035219 0.02340232
-## 12: NumberOfColors 0.010981692 0.012826227 0.02796171
-## 13:           Year 0.003915356 0.002031082 0.01008362
+##            Feature        Gain       Cover   Frequence
+##  1:           Time 0.198496237 0.264209752 0.244941671
+##  2: AgeuponOutcome 0.193444900 0.168891226 0.113272136
+##  3:      Sterility 0.188206014 0.056000467 0.018378275
+##  4:     DateInDays 0.107650537 0.210753928 0.186173264
+##  5:           Name 0.071883158 0.035335072 0.017976669
+##  6:            Day 0.055626217 0.072990670 0.124536240
+##  7:        Weekday 0.054463941 0.049413658 0.092732836
+##  8:     AnimalType 0.034074651 0.026169360 0.023790400
+##  9:          Month 0.029563117 0.031240210 0.064123159
+## 10:           Hour 0.025551440 0.020231548 0.036450564
+## 11:   CommonBreeds 0.014882550 0.032226086 0.018626889
+## 12:      BreedType 0.011499335 0.018622929 0.023274049
+## 13: NumberOfColors 0.011018209 0.011616315 0.026353031
+## 14:           Year 0.003639694 0.002298778 0.009370817
 ```
 
-![plot of chunk unnamed-chunk-31](figure/unnamed-chunk-31-1.png)
+![plot of chunk unnamed-chunk-28](figure/unnamed-chunk-28-1.png)
 
 Note that normally, we would have used a threshold to identify each animal associated to an outcome. Since this is a Kaggle competition, it is not required.
 
@@ -605,7 +509,7 @@ We can verify how our predictions score under the multi-class log-loss function.
 
 
 ```
-## [1] 0.4228592
+## [1] 0.4236739
 ```
 
 
@@ -616,9 +520,6 @@ We write the `ID` and the predicted outcome classes in the submission file.
 ```r
 prediction.test <- data.frame(matrix(prediction.test, ncol = outcome.class.num, byrow = TRUE))[, indices]
 colnames(prediction.test) <- outcomes.string
-
-#exploit.indices <- which(test$AnimalType == 1 & test$Name == 0 & test$Time %in% c(0, 540))
-#prediction.test[exploit.indices, ] <- data.frame(0, 0, 0, 0, 1)
 
 submission <- cbind(data.frame(ID = test.id), prediction.test)
 write.csv(submission, "Submission.csv", row.names = FALSE)
@@ -634,36 +535,60 @@ write.csv(submission, "Submission.csv", row.names = FALSE)
 The objective is to understand trends in animal outcomes. These insights could help shelters focus their energy on specific animals who need a little extra help finding a new home. Therefore, we need insights to help increasing the number of animals adopted.
 
 An important insight we found in the dataset is if the animal is sterile, not sterile or unknown. 
-![plot of chunk unnamed-chunk-34](figure/unnamed-chunk-34-1.png)
+![plot of chunk unnamed-chunk-31](figure/unnamed-chunk-31-1.png)
 
 The bar chart shows that animals with no information about its sterility are never adopted. They represent 4.0929328 % of the dataset where we already know the outcomes. Our predictions go the same way where the probabilities are very low as the following summary shows the results.
 
 
 ```
 ##       Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
-## 0.00003934 0.00013770 0.00022610 0.00147500 0.00054940 0.10840000
+## 0.00005009 0.00013870 0.00023320 0.00183700 0.00050570 0.20440000
 ```
 
-Intact animals have a low percentage of adoptions. They represent 5.1307561 % of intact animals (which are 7036).
+Intact animals have a low percentage of adoptions. They represent 5.1307561 % of 7036 intact animals.
 
 
 ```
 ##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-## 0.0000752 0.0005052 0.0069970 0.0523500 0.0364900 0.9655000
+## 0.0000866 0.0005206 0.0068240 0.0518200 0.0382400 0.9540000
 ```
 
-Sterile animals show a better adoption ratio. They represent 55.9599978 % of sterile animals (which are 18599). This is an increase of 50.8292417 % compared to the intact ones.
+Sterile animals show a better adoption ratio. They represent 55.9599978 % of 18599 sterile animals. This is an increase of 50.8292417 % compared to the intact ones.
 
 
 ```
 ##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-## 0.002281 0.324000 0.569400 0.571800 0.849900 0.999000
+## 0.002814 0.324600 0.566100 0.569500 0.848000 0.998400
 ```
 
 Since the adoption ratio is by far much better for sterile animals, we recommand to sterilize them when received to the Animal Center. This will greatly increase their chance to be adopted.
 
 Regarding the open hours of the Animal Center which is between 11am and 7pm during the work days, we observed that there are more adoptions between 5pm and 7pm. Since people normally finish working between 4h30pm and 5h30pm, this result makes sense.
 
-![plot of chunk unnamed-chunk-38](figure/unnamed-chunk-38-1.png)
+![plot of chunk unnamed-chunk-35](figure/unnamed-chunk-35-1.png)
 
-Therefore, we recommand to extend the open hours to allow people comming to the Animal Center after 7pm. 
+We can also see that the weekend (Saturday and Sunday), there are more adoptions, specially between 5pm and 7pm as for work days.
+
+
+```
+## Source: local data frame [119 x 4]
+## Groups: Hour, OutcomeType [20]
+## 
+##     Hour OutcomeType   WeekDay Total
+##    (int)       (chr)     (chr) (int)
+## 1     17    Adoption    Sunday   521
+## 2     18    Adoption    Sunday   476
+## 3     17    Adoption  Saturday   455
+## 4     18    Adoption  Saturday   360
+## 5     17    Adoption    Monday   341
+## 6     18    Adoption    Monday   337
+## 7     17    Adoption   Tuesday   294
+## 8     17    Adoption    Friday   287
+## 9     17    Adoption Wednesday   284
+## 10    16    Adoption  Saturday   272
+## ..   ...         ...       ...   ...
+```
+
+![plot of chunk unnamed-chunk-36](figure/unnamed-chunk-36-1.png)
+
+Therefore, we recommand to keep these open hours and extend them for the weekend as for the work days to allow people coming to the Animal Center.

@@ -6,8 +6,6 @@ output:
   html_document:
     number_sections: yes
     toc: yes
-  pdf_document:
-    toc: yes
 variant: markdown_github
 ---
 
@@ -210,7 +208,7 @@ test$AgeuponOutcome <- as.integer(test$AgeuponOutcome)
 The feature `Name` is transformed to a boolean value where the value is 0 when the animal has no name or his length is 1, and 1 otherwise. Logically, the name of an animal should not have any impact on the outcomes. But knowing that an animal has no name versus has a name may influance the outcomes. 
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-train.copy$NameLength[train$Name != 0] <- str_length(train$Name)
+train.copy$NameLength <- ifelse(train.copy$Name != 0, str_length(train.copy$Name), 0)
 
 train.copy %>% group_by(NameLength) %>%
     ggplot(aes(x = NameLength, fill = OutcomeType)) +
@@ -220,8 +218,8 @@ train.copy %>% group_by(NameLength) %>%
         scale_fill_brewer(palette = "Set1") + 
         labs(y = "Number of animals", x = "Name Length")
 
-train.cats.noname <- filter(train, AnimalType == "Cat" & Name == 0 & OutcomeType == "Transfer")
-train.transfers <- filter(train, OutcomeType == "Transfer")
+train.cats.noname <- filter(train.copy, AnimalType == "Cat" & Name == 0 & OutcomeType == "Transfer")
+train.transfers <- filter(train.copy, OutcomeType == "Transfer")
 ```
 
 From the bar chart, we can see that the name length follow the normal distribution if we exclude length of 0. Animals having no name are mostly transfered but for cats, this is very significant. Transferred cats having no name represent `r nrow(train.cats.noname) / train.n * 100` % of the train set and `r nrow(train.transfers) / train.n * 100` % of all the transferred animals of the train set. This is clearly an insight to consider. Therefore, we transform string values of the `Name` feature in boolean values telling if the animal has a name = 1 or has no name = 0.
@@ -246,7 +244,7 @@ train.copy %>% group_by(SexuponOutcome) %>%
         theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
-We can see that sterile animals are mostly adopted which confirms our hypothesis. Unknown or intact animals are mostly transferred. This makes sense with unknown ones since they may need to be transferred to the clinic to identify clearly their sex and if they are sterile or not. Note that animals that we do not know if they are sterile or not (Unknown) are not adopted. Thus, knowing if the animal is sterile or not has influance on the outcomes.
+We can see that sterile animals are mostly adopted which confirms our hypothesis. Unknown or intact animals are mostly transferred. This makes sense with unknown ones since they may need to be transferred to the clinic to identify clearly their sex and if they are sterile or not. Note that animals that we do not have information on their sterility and sex are not adopted. Thus, knowing if the animal is sterile or not has influance on the outcomes.
 
 From this bar chart, we distinguish 3 groups: Unknown, Intact (not neutered or not spayed), Sterile (neutered or spayed).
 
@@ -366,7 +364,6 @@ From the feature `DateTime` of the dataset, we extract many useful features. Tho
 * Day: integer from 1 to 31 depending on the month
 * Month: integer from 1 to 12
 * Year: integer from 2013 to 2016
-* Hour: integer from 0 to 23
 * Weekday: integer from 0 to 6 which represent Sunday to Saturday
 * DateInDays: Number of days from the oldest date of the dataset
 * Time: The time represented by the equation $60h + m$ where $h$ is the hours and $m$ the minutes.
@@ -377,18 +374,19 @@ test$Weekday <- as.POSIXlt(test$DateTime)$wday
 
 train.date <- ymd_hms(train$DateTime)
 test.date <- ymd_hms(test$DateTime)
-#years <- unique(c(year(train.date), year(test.date)))
 
 ## The year starts at 0 which is the minimum year of the dataset.
 train$Year <- year(train.date)
 train$Month <- month(train.date)
 train$Day <- day(train.date)
+train$Hour <- hour(train.date)
 train$DateInDays <- difftime(as.Date(train.date,'%Y/%m/%d'), as.Date(min(train.date),'%Y/%m/%d'), units = c("days"))
 train$Time <- hour(train.date) * 60 + minute(train.date)
 
 test$Year <- year(test.date)
 test$Month <- month(test.date)
 test$Day <- day(test.date)
+test$Hour <- hour(test.date)
 test$DateInDays <- difftime(as.Date(test.date,'%Y/%m/%d'), as.Date(min(test.date),'%Y/%m/%d'), units = c("days"))
 test$Time <- hour(test.date) * 60 + minute(test.date)
 
@@ -492,40 +490,20 @@ test$BreedType[test.breed.cross.list] <- 1
 test$BreedType[test.breed.mix.list] <- 0
 ```
 
+Special cases with Pit Bull, Shih Tzu and Pug are considered since they are less adopted than the others.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
 breeds <- c("Pit Bull", "Shih Tzu", "Pug")
-train$CommonBreeds <- GetIntegerFeatureFromGroups(train$Breed, breeds) - 1
-test$CommonBreeds <- GetIntegerFeatureFromGroups(test$Breed, breeds) - 1
+train$CommonBreeds <- GetIntegerFeatureFromGroups(train$Breed, breeds)
+test$CommonBreeds <- GetIntegerFeatureFromGroups(test$Breed, breeds)
 
 ## New feature 'HairType' where Shorthair = 0, Longhair = 1, Wirehair = 2, Medium Hair = 3
 #hair.type <- c("Shorthair", "Longhair", "Wirehair", "Medium Hair")
-#train$HairType <- as.integer(mapvalues(train$Breed, from = hair.type, to = seq(0, length(hair.type) - 1)))
-#test$HairType <- as.integer(mapvalues(test$Breed, from = hair.type, to = seq(0, length(hair.type) - 1)))
 #train$HairType <- GetIntegerFeatureFromGroups(train$Breed, hair.type) - 1
 #test$HairType <- GetIntegerFeatureFromGroups(test$Breed, hair.type) - 1
 
 # train$IsShorthair <- GetBooleanFeatureFromGroup(train$Breed, "Shorthair")
 # test$IsShorthair <- GetBooleanFeatureFromGroup(test$Breed, "Shorthair")
-# 
-# ## New feature 'IsDomestic' where Domestic = 1 otherwise = 0
-# train$IsDomestic <- GetBooleanFeatureFromGroup(train$Breed, "Domestic")
-# test$IsDomestic <- GetBooleanFeatureFromGroup(test$Breed, "Domestic")
-# 
-# ## New feature 'IsMiniature' where Miniature = 1 otherwise = 0
-# train$IsMiniature <- GetBooleanFeatureFromGroup(train$Breed, "Miniature")
-# test$IsMiniature <- GetBooleanFeatureFromGroup(test$Breed, "Miniature")
-# 
-# ## New feature 'IsPitbull' where Pit Bull = 1 otherwise = 0
-# train$IsPitbull <- GetBooleanFeatureFromGroup(train$Breed, "Pit Bull")
-# test$IsPitbull <- GetBooleanFeatureFromGroup(test$Breed, "Pit Bull")
-# 
-# ## New feature 'IsShihTzu' where Shih Tzu = 1 otherwise = 0
-# train$IsShihTzu <- GetBooleanFeatureFromGroup(train$Breed, "Shih Tzu")
-# test$IsShihTzu <- GetBooleanFeatureFromGroup(test$Breed, "Shih Tzu")
-# 
-# train$IsLabrador <- GetBooleanFeatureFromGroup(train$Breed, "Labrador Retriever")
-# test$IsLabrador <- GetBooleanFeatureFromGroup(test$Breed, "Labrador Retriever")
 
 train$Breed <- NULL
 test$Breed <- NULL
@@ -605,79 +583,16 @@ train.copy %>%
     facet_wrap(~AnimalType, ncol = 2) +
     scale_fill_brewer(palette = "Set1") +
     labs(y = "Number of animals", x = "Number of colors")
-```
 
-```{r echo = TRUE, message = FALSE, warning = FALSE}
 train$NumberOfColors <- train.copy$NumberOfColors
 
 test$NumberOfColors <- str_count(test$Color, "/") + 1
 test$NumberOfColors[grep("Tricolor", test$Color)] <- 3
-```
-
-<!--As we have seen previously, we know that if there is a separator, then we have 2 colors. Thus, we can split the feature `Color` in 2 features: `Color1` and `Color2`. To get `Color1`, we will take all strings without the separator or the left side of the string if a separator is found. For `Color2`, we will take the right side of all strings containing the separator. Those features will be converted as a positive integer where each represents a specific color. `Color2` is 0 if and only if there is no separator.
-
-```{r echo = TRUE, message = FALSE, warning = FALSE}
-# train.colors <- unique(c(gsub(".*/", "", train$Color), gsub("/.*", "", train$Color)))
-# train.colors.list <- unique(gsub(" .*$", "", train.colors))
-# indices <- grep("/", train$Color)
-# 
-# train.color1 <- gsub("/.*", "", train$Color)
-# train$Color1 <- GetIntegerFeatureFromGroups(train.color1, train.colors.list)
-# 
-# train.color2 <- rep("", length(train$Color))
-# train.color2[indices] <- gsub(".*/", "", train$Color[indices])
-# train$Color2 <- GetIntegerFeatureFromGroups(train.color2, train.colors.list)
-# 
-# 
-# test.colors <- unique(c(gsub(".*/", "", test$Color), gsub("/.*", "", test$Color)))
-# test.colors.list <- unique(gsub(" .*$", "", test.colors))
-# indices <- grep("/", test$Color)
-# 
-# test.color1 <- gsub("/.*", "", test$Color)
-# test$Color1 <- GetIntegerFeatureFromGroups(test.color1, test.colors.list)
-# 
-# test.color2 <- rep("", length(test$Color))
-# test.color2[indices] <- gsub(".*/", "", test$Color[indices])
-# test$Color2 <- GetIntegerFeatureFromGroups(test.color2, test.colors.list)
-```
-
-From the bar plots shown for animals color, we add binary features for the following colors (Tan, Tricolor, Brown, Buff, Yellow, Sable). They are special cases where colors have a high or low percentage of outcomes.
-
-```{r echo = TRUE, message = FALSE, warning = FALSE}
-## Cats
-#colors <- c("Tan", "Tricolor", "Brown", "Buff")
-#train$Color <- GetIntegerFeatureFromGroups(train$Color, colors) - 1
-#test$Color <- GetIntegerFeatureFromGroups(test$Color, colors) - 1
-
-# train$IsTan <- ifelse(train$Color == "Tan" & train$AnimalType == 1, 1, 0)
-# test$IsTan <- ifelse(test$Color == "Tan" & test$AnimalType == 1, 1, 0)
-# 
-# train$IsTricolor <- ifelse(train$Color == "Tricolor" & train$AnimalType == 1, 1, 0)
-# test$IsTricolor <- ifelse(test$Color == "Tricolor" & test$AnimalType == 1, 1, 0)
-# 
-# train$IsBrown <- ifelse(train$Color == "Brown" & train$AnimalType == 1, 1, 0)
-# test$IsBrown <- ifelse(test$Color == "Brown" & test$AnimalType == 1, 1, 0)
-# 
-# train$IsBuff <- ifelse(train$Color == "Buff" & train$AnimalType == 1, 1, 0)
-# test$IsBuff <- ifelse(test$Color == "Buff" & test$AnimalType == 1, 1, 0)
-# 
-# ## Dogs
-# train$IsYellow <- ifelse(train$Color == "Yellow" & train$AnimalType == 0, 1, 0)
-# test$IsYellow <- ifelse(test$Color == "Yellow" & test$AnimalType == 0, 1, 0)
-# 
-# train$IsSable <- ifelse(train$Color == "Sable" & train$AnimalType == 0, 1, 0)
-# test$IsSable <- ifelse(test$Color == "Sable" & test$AnimalType == 0, 1, 0)
-# 
-#train$IsBlack <- ifelse(train$Color == "Black", 1, 0)
-#test$IsBlack <- ifelse(test$Color == "Black", 1, 0)
-# 
-# train$IsTabby <- ifelse(grepl("Tabby", train$Color), 1, 0)
-# test$IsTabby <- ifelse(grepl("Tabby", test$Color), 1, 0)
 
 train$Color <- NULL
 test$Color <- NULL
 ```
--->
+
 
 
 <!----------------------------------------------------------------------TRAINING MODEL--------------------------------------------------------------------------->
@@ -698,7 +613,6 @@ We use the `subsample` parameter which is the subsample ratio of the training in
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
 outcomes.string <- sort(unique(train$OutcomeType))
 outcome.type <- CategoryToInteger(train$OutcomeType) - 1
-#as.integer(mapvalues(train$OutcomeType, from = outcomes.string, to = seq(0, length(outcomes.string) - 1)))
 indices <- order(unique(train$OutcomeType))
 
 train$OutcomeSubtype <- NULL
@@ -808,9 +722,6 @@ We write the `ID` and the predicted outcome classes in the submission file.
 prediction.test <- data.frame(matrix(prediction.test, ncol = outcome.class.num, byrow = TRUE))[, indices]
 colnames(prediction.test) <- outcomes.string
 
-#exploit.indices <- which(test$AnimalType == 1 & test$Name == 0 & test$Time %in% c(0, 540))
-#prediction.test[exploit.indices, ] <- data.frame(0, 0, 0, 0, 1)
-
 submission <- cbind(data.frame(ID = test.id), prediction.test)
 write.csv(submission, "Submission.csv", row.names = FALSE)
 ```
@@ -851,14 +762,14 @@ steriles <- nrow(filter(train.copy, grepl("Spayed|Neutered", train.copy$SexuponO
 steriles.adoption <- nrow(filter(train.copy, grepl("Spayed|Neutered", train.copy$SexuponOutcome), OutcomeType == "Adoption")) / steriles * 100
 ```
 
-Intact animals have a low percentage of adoptions. They represent `r intacts.adoption` % of intact animals (which are `r intacts`).
+Intact animals have a low percentage of adoptions. They represent `r intacts.adoption` % of `r intacts` intact animals.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 indices <- which(test$Sterility == 1)
 summary(prediction.test$Adoption[indices])
 ```
 
-Sterile animals show a better adoption ratio. They represent `r steriles.adoption` % of sterile animals (which are `r steriles`). This is an increase of `r steriles.adoption - intacts.adoption` % compared to the intact ones.
+Sterile animals show a better adoption ratio. They represent `r steriles.adoption` % of `r steriles` sterile animals. This is an increase of `r steriles.adoption - intacts.adoption` % compared to the intact ones.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 indices <- which(test$Sterility == 2)
@@ -870,15 +781,33 @@ Since the adoption ratio is by far much better for sterile animals, we recommand
 Regarding the open hours of the Animal Center which is between 11am and 7pm during the work days, we observed that there are more adoptions between 5pm and 7pm. Since people normally finish working between 4h30pm and 5h30pm, this result makes sense.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-train.copy$Hour <- hour(train.date)
-
 train.copy %>% group_by(Hour) %>%
     ggplot(aes(x = Hour, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
-        ggtitle("Hours by outcome") +
+        ggtitle("Number of animals for each hour by outcome") +
         facet_wrap(~AnimalType, ncol = 2) +
         labs(y = "Number of animals", x = "Hours") +
         scale_fill_brewer(palette = "Set1")
 ```
 
-Therefore, we recommand to extend the open hours to allow people comming to the Animal Center after 7pm. 
+We can also see that the weekend (Saturday and Sunday), there are more adoptions, specially between 5pm and 7pm as for work days.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+## Get number of adoptions per hours for each weekday.
+train.adopted.list <- train.copy %>% 
+    group_by(Hour, OutcomeType, WeekDay) %>% 
+    summarise(Total = n()) %>% 
+    filter(OutcomeType == "Adoption")
+train.adopted.list <- train.adopted.list[with(train.adopted.list, order(-Total)), ]
+
+print(train.adopted.list)
+
+train.adopted.list %>%
+    ggplot(aes(x = Hour, y = Total)) +
+        geom_bar(stat = "identity") + 
+        facet_wrap(~WeekDay, ncol = 3, nrow = 3) +
+        ggtitle("Number of adopted animals for each hour by Weekday") +
+        labs(y = "Number of animals", x = "Hours")
+```
+
+Therefore, we recommand to keep these open hours and extend them for the weekend as for the work days to allow people coming to the Animal Center.
