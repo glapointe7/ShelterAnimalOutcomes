@@ -29,7 +29,7 @@ def main():
     test.extractNumberOfColors()
 
     train_model = Model(train, test)
-    #best_parameters = train_model.findBestParameters(number_of_estimators=200)
+    #best_parameters = train_model.findBestParameters(number_of_estimators=100)
     predictions = train_model.train({'learning_rate': 0.12, 'subsample': 0.8, 'colsample_bytree': 0.9}, 200)
     train_model.save(predictions)
 

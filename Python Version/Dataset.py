@@ -9,7 +9,6 @@ from BarChartPlot import *
 class Dataset:
     _dataset = []
 
-
     def get(self):
         return self._dataset
 
@@ -77,11 +76,12 @@ class Dataset:
             if pandas.isnull(sex):
                 sterilities.append(0)
             else:
-                if 'Unknown' in sex:
+                sterility = sex.split(' ')
+                if 'Unknown' in sterility:
                     sterilities.append(0)
-                elif 'Intact' in sex:
+                elif 'Intact' in sterility:
                     sterilities.append(1)
-                elif any(sterility_type in sex for sterility_type in ['Spayed', 'Neutered']):
+                elif any(sterility_type in sterility for sterility_type in ['Spayed', 'Neutered']):
                     sterilities.append(2)
                 else:
                     sterilities.append(0)
@@ -122,15 +122,16 @@ class Dataset:
     # Get the unique outcomes from the OutcomeType feature.
     def getUniqueOutcomeTypes(self):
         outcomes = self._dataset['OutcomeType'].values.tolist()
-        return list(set(outcomes))
 
+        return sorted(list(set(outcomes)))
 
-    def convertOutcomeTypeToInteger(self, feature):
+    #
+    def convertOutcomeToInteger(self):
         outcome_list = self.getUniqueOutcomeTypes()
-        outcome_types = self._dataset[feature].values.tolist()
+        outcome_types = self._dataset['OutcomeType'].values.tolist()
 
         for i, outcome in enumerate(outcome_list):
             for j, outcome_type in enumerate(outcome_types):
                 if outcome == outcome_type:
                     outcome_types[j] = i
-        self._dataset[feature] = outcome_types
+        self._dataset['OutcomeType'] = outcome_types
