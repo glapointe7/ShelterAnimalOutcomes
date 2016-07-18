@@ -10,14 +10,14 @@ class BarChartPlot:
         plt.style.use('ggplot')
         self._dataset = dataset
 
-
-    def AgeByOutcomePlot(self):
+    #
+    def ageByOutcomePlot(self):
         age = self._dataset.groupby(['AgeuponOutcome', 'OutcomeType']).size().unstack()
-        agePlot = age.plot(kind = 'bar', stacked = True, figsize = (12, 13))
-        agePlot.set_title("Number of animals by Age and outcome")
-        agePlot.set_xlabel("Age of animals")
-        agePlot.set_ylabel("Number of animals")
+        age_plot = age.plot(kind='bar', stacked=True, figsize=(12, 13))
+        age_plot.set_title('Number of animals by Age and outcome')
+        age_plot.set_xlabel('Age of animals')
+        age_plot.set_ylabel('Number of animals')
 
-        fig = agePlot.get_figure()
-        fig.savefig("AgeByOutcome.png")
+        fig = age_plot.get_figure()
+        fig.savefig('AgeByOutcome.png')
 
