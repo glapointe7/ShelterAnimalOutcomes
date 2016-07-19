@@ -114,10 +114,46 @@ class Dataset:
 
         self.removeFeatures('DateTime')
 
-    # TODO
+    # If we find a slash `/` character which we define as a `separator`, then we have 2 colors.
+    # If we find `Tricolor`, then this means that we have 3 colors.
     def extractNumberOfColors(self):
+        colors = self._dataset['Color'].values.tolist()
+        self._dataset['NumberOfColors'] = [color.count('/') + 1 for color in colors]
         self.removeFeatures('Color')
+
+    # We extract this information from the `Breed` feature and add a new feature `BreedType`
+    # where all purebred animals are identified with the value 0.
+    # The mixed breed are identified with the value 2 and crossed breed with value 1.
+    def extractBreedType(self):
+        breed_list = self._dataset['Breed'].values.tolist()
+
+        breed_type_list = []
+        for breed in breed_list:
+            if ' Mix' in breed:
+                breed_type_list.append(2)
+            elif '/' in breed:
+                breed_type_list.append(1)
+            else:
+                breed_type_list.append(0)
+        self._dataset['BreedType'] = breed_type_list
+        self.extractSpecialBreeds()
         self.removeFeatures('Breed')
+
+    # Special cases with Pit Bull, Shih Tzu and Pug are considered since they are less adopted than the others.
+    def extractSpecialBreeds(self):
+        breed_list = self._dataset['Breed'].values.tolist()
+
+        breed_specials = []
+        for breed in breed_list:
+            if 'Pit Bull' in breed:
+                breed_specials.append(1)
+            elif 'Shih Tzu' in breed:
+                breed_specials.append(2)
+            elif 'Pug' in breed:
+                breed_specials.append(3)
+            else:
+                breed_specials.append(0)
+        self._dataset['SpecialBreed'] = breed_specials
 
     # Get the unique outcomes from the OutcomeType feature.
     def getUniqueOutcomeTypes(self):

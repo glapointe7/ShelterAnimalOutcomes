@@ -477,18 +477,18 @@ train.copy %>%
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
-We extract this information from the `Breed` feature and add a new feature `BreedType` where all purebred animals are identified with the value 2 per the code book. The mixed breed are identified with the value 0 and crossed breed with value 1.
+We extract this information from the `Breed` feature and add a new feature `BreedType` where all purebred animals are identified with the value 0. The mixed breed are identified with the value 2 and crossed breed with value 1.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-train$BreedType <- 2
+train$BreedType <- 0
 train$BreedType[train.breed.cross.list] <- 1
-train$BreedType[train.breed.mix.list] <- 0
+train$BreedType[train.breed.mix.list] <- 2
 
 test.breed.mix.list <- grep(" Mix", test$Breed)
 test.breed.cross.list <- grep("/", test$Breed)
-test$BreedType <- 2
+test$BreedType <- 0
 test$BreedType[test.breed.cross.list] <- 1
-test$BreedType[test.breed.mix.list] <- 0
+test$BreedType[test.breed.mix.list] <- 2
 ```
 
 Special cases with Pit Bull, Shih Tzu and Pug are considered since they are less adopted than the others.
