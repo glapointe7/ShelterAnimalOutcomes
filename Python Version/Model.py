@@ -15,9 +15,10 @@ class Model:
     _target = []
     _test_id = []
 
+    # Initialize train and test matrices and remove ID and outcome features.
     def __init__(self, train, test):
         self._train_matrix = train.get()
-        train.convertOutcomeToInteger()
+        train.convert_outcomes_to_integers()
         self._target = self._train_matrix['OutcomeType'].values
         self._train_matrix.drop('AnimalID', axis=1, inplace=True)
         self._train_matrix.drop('OutcomeType', axis=1, inplace=True)
@@ -28,7 +29,7 @@ class Model:
         self._test_matrix.drop('ID', axis=1, inplace=True)
 
     # Find the best parameters to apply to the xgboost algorithm depending on the dataset and the target.
-    def findBestParameters(self, number_of_estimators):
+    def find_best_parameters(self, number_of_estimators):
         number_of_folds = 10
         classifier_parameters = {'max_depth': 8,
                                  'n_estimators': number_of_estimators,
@@ -43,6 +44,12 @@ class Model:
         grid_cv = GridSearchCV(estimator=xgb_classifier, param_grid=grid_parameters, scoring='log_loss', cv=number_of_folds)
         grid_cv.fit(self._train_matrix, self._target)
 
+        self.print_report(grid_cv)
+
+        return grid_cv.best_params_
+
+    # Print a complete report containing the best parameters and scores obtained.
+    def print_report(self, grid_cv):
         print("Best parameters set found on development set:")
         print()
         print(grid_cv.best_params_)
@@ -62,27 +69,7 @@ class Model:
         print(classification_report(self._target, cv_predictions))
         print()
 
-        return grid_cv.best_params_
-
-    #
-    # def crossValidate(self, best_parameters, number_of_estimators):
-    #     number_of_folds = 10
-    #     parameters = {'max_depth': 8,
-    #                   'objective': 'multi:softprob',
-    #                   'eval_metric': 'mlogloss',
-    #                   'eta': best_parameters['learning_rate'],
-    #                   'subsample': best_parameters['subsample'],
-    #                   'colsample_bytree': best_parameters['colsample_bytree'],
-    #                   'num_class': 5,
-    #                   'seed': 1234,
-    #                   'silent': True}
-    #
-    #     self._train_matrix = xgb.DMatrix(self._train_matrix, self._target)
-    #     model_cv = xgb.cv(parameters, self._train_matrix, number_of_estimators, number_of_folds)
-    #
-    #     return model_cv
-
-    #
+    # Build a model with xgboost and train the model with the best parameters.
     def train(self, best_parameters, number_of_estimators):
         parameters = {'max_depth': 8,
                       'objective': 'multi:softprob',
@@ -101,7 +88,7 @@ class Model:
         predictions_test = model.predict(self._test_matrix)
         predictions_train = model.predict(self._train_matrix)
 
-        print('Train Log-Loss = ' + repr(self.multiClassLogLoss(numpy.array(self._target), numpy.array(predictions_train))))
+        print('Train Log-Loss = ' + repr(self.multi_class_logloss(numpy.array(self._target), numpy.array(predictions_train))))
 
         importance = xgb.plot_importance(model)
         fig = importance.get_figure()
@@ -129,7 +116,7 @@ class Model:
     -------
     loss : float
     """
-    def multiClassLogLoss(self, y_true, y_pred, eps=1e-15):
+    def multi_class_logloss(self, y_true, y_pred, eps=1e-15):
         predictions = numpy.clip(y_pred, eps, 1 - eps)
 
         # Normalize row sums to 1.
