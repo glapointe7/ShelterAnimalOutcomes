@@ -3,7 +3,6 @@
 import pandas
 import pathlib
 from datetime import datetime
-from BarChartPlot import *
 
 
 class Dataset:
@@ -23,11 +22,6 @@ class Dataset:
     # Remove features (columns) specified from the dataset.
     def remove_features(self, features):
         self._dataset = self._dataset.drop(features, axis=1)
-
-    # Plot all needed Bar charts.
-    def explore(self):
-        bar_chart = BarChartPlot(self._dataset)
-        bar_chart.plot_age_by_outcome()
 
     # We transform the feature AgeuponOutcome to integer values. For example, the age should be counted in days.
     # Thus, 2 years is replaced by the value 2 * 365 = 730. For months, the formula is age * 30.
@@ -133,7 +127,7 @@ class Dataset:
             else:
                 breed_type_list.append(0)
         self._dataset['BreedType'] = breed_type_list
-        self.extractSpecialBreeds()
+        self.extract_special_breeds()
         self.remove_features('Breed')
 
     # Special cases with Pit Bull, Shih Tzu and Pug are considered since they are less adopted than the others.

@@ -1,6 +1,16 @@
 #!/usr/bin/python3
 
 from Model import *
+from BarChartPlot import *
+
+
+# Plot all needed Bar charts.
+def explore(dataset):
+    bar_chart = BarChartPlot(dataset)
+    bar_chart.plot_age_by_outcome()
+    #bar_chart.plot_outcome_percentages()
+    #bar_chart.plot_outcome_percentages_per_animal_type()
+    #bar_chart.plot_age_by_outcome_per_animal_type()
 
 
 def main():
@@ -10,8 +20,7 @@ def main():
     test = Dataset()
     test.load("../test.csv")
 
-    # Explore the train set.
-    #train.explore()
+    explore(train)
 
     # Transform / create / remove features from train and test sets.
     train.convert_age_to_integer()
@@ -21,7 +30,6 @@ def main():
     train.convert_animal_type_to_bool()
     train.extract_number_of_colors()
     train.extract_breed_types()
-    train.extract_special_breeds()
 
     test.convert_age_to_integer()
     test.convert_name_to_bool()
@@ -30,13 +38,12 @@ def main():
     test.convert_animal_type_to_bool()
     test.extract_number_of_colors()
     test.extract_breed_types()
-    test.extract_special_breeds()
 
-    train_model = Model(train, test)
-    best_parameters = train_model.find_best_parameters(number_of_estimators=100)
+    #train_model = Model(train, test)
+    #best_parameters = train_model.find_best_parameters(number_of_estimators=100)
     #best_parameters = {'subsample': 0.8, 'colsample_bytree': 0.9, 'learning_rate': 0.12}
-    predictions = train_model.train(best_parameters, number_of_estimators=100)
-    train_model.save(predictions)
+    #predictions = train_model.train(best_parameters, number_of_estimators=100)
+    #train_model.save(predictions)
 
 
 if __name__ == "__main__":
