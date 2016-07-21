@@ -175,11 +175,24 @@ test$AgeuponOutcome[test.day.list] <- test.age[test.day.list]
 
 train$AgeuponOutcome <- as.integer(train$AgeuponOutcome)
 test$AgeuponOutcome <- as.integer(test$AgeuponOutcome)
+
+train.copy$Age <- train$AgeuponOutcome
+train.copy$Age[train.copy$Age < 365] <- 0
+
+train.copy %>% group_by(Age) %>%
+     ggplot(aes(x = Age, fill = OutcomeType)) +
+        geom_bar(stat = "count") + 
+        facet_wrap(~AnimalType, nrow = 2) +
+        ggtitle("Age of animals by outcome ordered by number of animals") +
+        labs(y = "Number of animals", x = "Age of animals") +
+        scale_fill_brewer(palette = "Set1")
 ```
+
+![plot of chunk unnamed-chunk-6](figure/unnamed-chunk-6-1.png)
 
 
 ## Animal's Name
-The feature `Name` is transformed to a boolean value where the value is 0 when the animal has no name or his length is 1, and 1 otherwise. Logically, the name of an animal should not have any impact on the outcomes. But knowing that an animal has no name versus has a name may influance the outcomes. 
+The feature `Name` is transformed to a boolean value where the value is 0 when the animal has no name and 1 otherwise. Logically, the name of an animal should not have any impact on the outcomes. But knowing that an animal has no name versus has a name may influance the outcomes. 
 
 ![plot of chunk unnamed-chunk-7](figure/unnamed-chunk-7-1.png)
 
@@ -258,6 +271,7 @@ From the feature `DateTime` of the dataset, we extract many useful features. Tho
 * Year: integer from 2013 to 2016
 * Weekday: integer from 0 to 6 which represent Sunday to Saturday
 * DateInDays: Number of days from the oldest date of the dataset
+* Hour: integer from 0 to 23 where 0 = midnight
 * Time: The time represented by the equation $60h + m$ where $h$ is the hours and $m$ the minutes.
 
 
@@ -325,19 +339,19 @@ We also check if the breed types (Mix, Cross or Pure) have a significant impact 
 
 ![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-1.png)
 
-We extract this information from the `Breed` feature and add a new feature `BreedType` where all purebred animals are identified with the value 2 per the code book. The mixed breed are identified with the value 0 and crossed breed with value 1.
+We extract this information from the `Breed` feature and add a new feature `BreedType` where all purebred animals are identified with the value 0. The mixed breed are identified with the value 2 and crossed breed with value 1.
 
 
 ```r
-train$BreedType <- 2
+train$BreedType <- 0
 train$BreedType[train.breed.cross.list] <- 1
-train$BreedType[train.breed.mix.list] <- 0
+train$BreedType[train.breed.mix.list] <- 2
 
 test.breed.mix.list <- grep(" Mix", test$Breed)
 test.breed.cross.list <- grep("/", test$Breed)
-test$BreedType <- 2
+test$BreedType <- 0
 test$BreedType[test.breed.cross.list] <- 1
-test$BreedType[test.breed.mix.list] <- 0
+test$BreedType[test.breed.mix.list] <- 2
 ```
 
 Special cases with Pit Bull, Shih Tzu and Pug are considered since they are less adopted than the others.
@@ -407,7 +421,7 @@ train$OutcomeType <- NULL
 outcome.class.num <- length(outcomes.string)
 param <- list(objective        = "multi:softprob",
               num_class        = outcome.class.num,    
-              eta              = 0.15,      # Control the learning rate
+              eta              = 0.12,      # Control the learning rate
               subsample        = 0.8,
               max_depth        = 8,        # Maximum depth of the tree
               colsample_bytree = 0.9,     # Subsample ratio of columns when constructing each tree
@@ -426,54 +440,54 @@ We also display 2 curves indicating the test and train multi-Logloss mean progre
 
 ```
 ##      train.mlogloss.mean train.mlogloss.std test.mlogloss.mean
-##   1:            1.443285           0.004833           1.450210
-##   2:            1.319164           0.003541           1.332229
-##   3:            1.220161           0.002784           1.239773
-##   4:            1.141034           0.004172           1.166069
-##   5:            1.074804           0.005655           1.105386
+##   1:            1.475111           0.003918           1.480649
+##   2:            1.368849           0.003043           1.379403
+##   3:            1.280670           0.002463           1.296582
+##   4:            1.207875           0.003879           1.228346
+##   5:            1.145335           0.005523           1.170455
 ##  ---                                                          
-## 226:            0.221804           0.001541           0.733730
-## 227:            0.220855           0.001499           0.733972
-## 228:            0.219824           0.001538           0.734304
-## 229:            0.218914           0.001527           0.734533
-## 230:            0.217975           0.001558           0.734792
+## 226:            0.273856           0.002023           0.721984
+## 227:            0.272875           0.002011           0.722153
+## 228:            0.271873           0.002015           0.722307
+## 229:            0.270858           0.001929           0.722459
+## 230:            0.269838           0.001999           0.722582
 ##      test.mlogloss.std names
-##   1:          0.005901     1
-##   2:          0.005278     2
-##   3:          0.005692     3
-##   4:          0.006333     4
-##   5:          0.006954     5
+##   1:          0.004783     1
+##   2:          0.004409     2
+##   3:          0.004844     3
+##   4:          0.005615     4
+##   5:          0.006325     5
 ##  ---                        
-## 226:          0.021884   226
-## 227:          0.021728   227
-## 228:          0.021812   228
-## 229:          0.021735   229
-## 230:          0.021677   230
+## 226:          0.019219   226
+## 227:          0.019200   227
+## 228:          0.019143   228
+## 229:          0.019240   229
+## 230:          0.019318   230
 ```
 
 ```
 ## 
-## Optimal testing set Log-Loss score: 0.711648
+## Optimal testing set Log-Loss score: 0.711664
 ```
 
 ```
 ## 
-## Associated training set Log-Loss score: 0.411467
+## Associated training set Log-Loss score: 0.41399
 ```
 
 ```
 ## 
-## Interval testing set Log-Loss score: [ 0.695559 ,  0.727737 ].
+## Interval testing set Log-Loss score: [ 0.695175 ,  0.728153 ].
 ```
 
 ```
 ## 
-## Difference between optimal training and testing sets Log-Loss: -0.300181
+## Difference between optimal training and testing sets Log-Loss: -0.297674
 ```
 
 ```
 ## 
-## Optimal number of trees: 98
+## Optimal number of trees: 121
 ```
 
 
@@ -483,20 +497,20 @@ We proceed to the predictions of the test set and show the features importance.
 
 ```
 ##            Feature        Gain       Cover   Frequence
-##  1:           Time 0.198496237 0.264209752 0.244941671
-##  2: AgeuponOutcome 0.193444900 0.168891226 0.113272136
-##  3:      Sterility 0.188206014 0.056000467 0.018378275
-##  4:     DateInDays 0.107650537 0.210753928 0.186173264
-##  5:           Name 0.071883158 0.035335072 0.017976669
-##  6:            Day 0.055626217 0.072990670 0.124536240
-##  7:        Weekday 0.054463941 0.049413658 0.092732836
-##  8:     AnimalType 0.034074651 0.026169360 0.023790400
-##  9:          Month 0.029563117 0.031240210 0.064123159
-## 10:           Hour 0.025551440 0.020231548 0.036450564
-## 11:   CommonBreeds 0.014882550 0.032226086 0.018626889
-## 12:      BreedType 0.011499335 0.018622929 0.023274049
-## 13: NumberOfColors 0.011018209 0.011616315 0.026353031
-## 14:           Year 0.003639694 0.002298778 0.009370817
+##  1:           Time 0.198258341 0.264619918 0.244790460
+##  2: AgeuponOutcome 0.192224067 0.166925665 0.114355006
+##  3:      Sterility 0.190454481 0.057478354 0.017254429
+##  4:     DateInDays 0.107002818 0.204292857 0.185272719
+##  5:           Name 0.070571185 0.033988858 0.018057680
+##  6:            Day 0.055456406 0.076373826 0.122866367
+##  7:        Weekday 0.054656494 0.052554562 0.094134730
+##  8:     AnimalType 0.033959505 0.025629085 0.023325146
+##  9:          Month 0.029993976 0.032399469 0.063951064
+## 10:           Hour 0.026217875 0.019854356 0.037505600
+## 11:   CommonBreeds 0.014744520 0.031161746 0.018706458
+## 12:      BreedType 0.011909365 0.019964272 0.023402382
+## 13: NumberOfColors 0.011178811 0.012346745 0.027310502
+## 14:           Year 0.003372156 0.002410288 0.009067458
 ```
 
 ![plot of chunk unnamed-chunk-28](figure/unnamed-chunk-28-1.png)
@@ -509,7 +523,7 @@ We can verify how our predictions score under the multi-class log-loss function.
 
 
 ```
-## [1] 0.4236739
+## [1] 0.4252021
 ```
 
 
@@ -541,8 +555,8 @@ The bar chart shows that animals with no information about its sterility are nev
 
 
 ```
-##       Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
-## 0.00005009 0.00013870 0.00023320 0.00183700 0.00050570 0.20440000
+##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+## 0.0000598 0.0001487 0.0002488 0.0018640 0.0005468 0.1966000
 ```
 
 Intact animals have a low percentage of adoptions. They represent 5.1307561 % of 7036 intact animals.
@@ -550,7 +564,7 @@ Intact animals have a low percentage of adoptions. They represent 5.1307561 % of
 
 ```
 ##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-## 0.0000866 0.0005206 0.0068240 0.0518200 0.0382400 0.9540000
+## 0.0000671 0.0005453 0.0068780 0.0512300 0.0372900 0.9444000
 ```
 
 Sterile animals show a better adoption ratio. They represent 55.9599978 % of 18599 sterile animals. This is an increase of 50.8292417 % compared to the intact ones.
@@ -558,7 +572,7 @@ Sterile animals show a better adoption ratio. They represent 55.9599978 % of 185
 
 ```
 ##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-## 0.002814 0.324600 0.566100 0.569500 0.848000 0.998400
+## 0.002305 0.322800 0.571500 0.570000 0.842600 0.998200
 ```
 
 Since the adoption ratio is by far much better for sterile animals, we recommand to sterilize them when received to the Animal Center. This will greatly increase their chance to be adopted.

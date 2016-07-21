@@ -156,15 +156,13 @@ test$AnimalType <- GetIntegerFeatureFromGroups(test$AnimalType, animal.types) - 
 The age of animals should be an important factor on outcomes. People want to adopt a young animal (between 1 month and 1 year old) because they can raise the animal more easily and keep it longer. Older animals (Over 1 year old) may have more difficulty to respond to their new master. Baby animals may be subject to a transfer for experimentations or for clinical reasons. Adopting a baby animal (less than a month old) needs more attention from the owner. Thus, adoptions should not be frequent for them. We show a bar chart of ages of animals.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-#outcomes <- factor(train$OutcomeType, levels = unique(train$OutcomeType))
 train.copy$AgeuponOutcome[grep("1 week", train.copy$AgeuponOutcome)] <- "1 week"
 
 train.copy %>% group_by(AgeuponOutcome) %>%
-    #ggplot(aes(x = reorder(AgeuponOutcome, outcomes == "Adoption", sum), fill = OutcomeType)) +
      ggplot(aes(x = AgeuponOutcome, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         facet_wrap(~AnimalType, nrow = 2) +
-        ggtitle("Age of animals by outcome ordered by number of animals adopted") +
+        ggtitle("Age of animals by outcome ordered by number of animals") +
         labs(y = "Number of animals", x = "Age of animals") +
         scale_fill_brewer(palette = "Set1") +
         theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
@@ -201,6 +199,17 @@ test$AgeuponOutcome[test.day.list] <- test.age[test.day.list]
 
 train$AgeuponOutcome <- as.integer(train$AgeuponOutcome)
 test$AgeuponOutcome <- as.integer(test$AgeuponOutcome)
+
+train.copy$Age <- train$AgeuponOutcome
+train.copy$Age[train.copy$Age < 365] <- 0
+
+train.copy %>% group_by(Age) %>%
+     ggplot(aes(x = Age, fill = OutcomeType)) +
+        geom_bar(stat = "count") + 
+        facet_wrap(~AnimalType, nrow = 2) +
+        ggtitle("Age of animals by outcome ordered by number of animals") +
+        labs(y = "Number of animals", x = "Age of animals") +
+        scale_fill_brewer(palette = "Set1")
 ```
 
 
@@ -622,7 +631,7 @@ train$OutcomeType <- NULL
 outcome.class.num <- length(outcomes.string)
 param <- list(objective        = "multi:softprob",
               num_class        = outcome.class.num,    
-              eta              = 0.15,      # Control the learning rate
+              eta              = 0.12,      # Control the learning rate
               subsample        = 0.8,
               max_depth        = 8,        # Maximum depth of the tree
               colsample_bytree = 0.9,     # Subsample ratio of columns when constructing each tree
@@ -702,7 +711,7 @@ Note that normally, we would have used a threshold to identify each animal assoc
 We can verify how our predictions score under the multi-class log-loss function. We take our predictions applied to the train set and we compare to the real `OutcomeType` values of the train set.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-prediction.train <- matrix(prediction.train, ncol = outcome.class.num, byrow = TRUE)
+prediction.train.matrix <- matrix(prediction.train, ncol = outcome.class.num, byrow = TRUE)
 
 rows <- nrow(train)
 outcomes <- matrix(0, nrow = rows, ncol = outcome.class.num)
@@ -711,8 +720,16 @@ for(i in 1:rows)
     outcomes[i ,outcome.type[i] + 1] <- 1
 }
 
-multiclass.logloss <- MultiLogLoss(prediction.train, outcomes)
+multiclass.logloss <- MultiLogLoss(prediction.train.matrix, outcomes)
 print(multiclass.logloss)
+
+## Confusion matrix
+predicted.train <- data.frame(prediction.train.matrix)
+colnames(predicted.train) <- unique(train.copy$OutcomeType)
+predicted <- predicted.train / rowSums(predicted.train)
+predicted$Class <- apply(predicted.train, 1, function(x) names(predicted.train)[which.max(x)])
+
+confusionMatrix(predicted$Class, train.copy$OutcomeType)
 ```
 
 

@@ -20,7 +20,7 @@ def main():
     test = Dataset()
     test.load("../test.csv")
 
-    explore(train)
+    #explore(train)
 
     # Transform / create / remove features from train and test sets.
     train.convert_age_to_integer()
@@ -39,11 +39,12 @@ def main():
     test.extract_number_of_colors()
     test.extract_breed_types()
 
-    #train_model = Model(train, test)
-    #best_parameters = train_model.find_best_parameters(number_of_estimators=100)
+    # Train the data with the XG Boost algorithm on 5 classes.
+    train_model = Model(train, test)
+    best_parameters = train_model.find_best_parameters(number_of_estimators=100)
     #best_parameters = {'subsample': 0.8, 'colsample_bytree': 0.9, 'learning_rate': 0.12}
-    #predictions = train_model.train(best_parameters, number_of_estimators=100)
-    #train_model.save(predictions)
+    predictions = train_model.train(best_parameters, number_of_estimators=100)
+    train_model.save(predictions)
 
 
 if __name__ == "__main__":

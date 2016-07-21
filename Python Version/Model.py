@@ -34,10 +34,10 @@ class Model:
         classifier_parameters = {'max_depth': 8,
                                  'n_estimators': number_of_estimators,
                                  'objective': 'multi:softprob',
+                                 'colsample_bytree': 0.9,
                                  'seed': 1234}
-        grid_parameters = {'learning_rate': [0.1, 0.12, 0.15],
-                           'subsample': [0.8, 0.75],
-                           'colsample_bytree': [0.9, 0.85]}
+        grid_parameters = {'learning_rate': [0.11, 0.12, 0.13, 0.14],
+                           'subsample': [0.8, 0.75]}
 
         xgb_classifier = XGBClassifier(**classifier_parameters)
 
@@ -76,7 +76,7 @@ class Model:
                       'eval_metric': 'mlogloss',
                       'eta': best_parameters['learning_rate'],
                       'subsample': best_parameters['subsample'],
-                      'colsample_bytree': best_parameters['colsample_bytree'],
+                      'colsample_bytree': 0.9,
                       'num_class': 5,
                       'seed': 1234,
                       'silent': 1}
