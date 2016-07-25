@@ -9,7 +9,7 @@ output:
 variant: markdown_github
 ---
 
-# Introduction
+# Data Acquisition
 Every year, approximately 7.6 million companion animals end up in US shelters. Many animals are given up as unwanted by their owners, while others are picked up after getting lost or taken out of cruelty situations. Many of these animals find forever families to take them home, but just as many are not so lucky. 2.7 million dogs and cats are euthanized in the US every year.
 
 
@@ -66,7 +66,7 @@ In this document, we start by exploring the dataset and build the data story beh
 
 
 
-# Exploratory Analysis
+# Data Preparation and Exploratory
 In this section, we explore the dataset and we test hypotheses on features. The objective is to visualize and understand the relationships between features in the dataset we have to solve the problem. We will also compare changes we will make to this dataset to validate if they have significant influance on the outcomes or not.
 
 We will also add and remove features from the dataset depending on the importance of insights we will find with data visualization. We will transform each feature in categories represented by a positive integer. The objective is to clean and prepare the dataset for our prediction's model and to answer the questions: `Are there features that can be split in many other features? If yes, are they improving the score? Why and how?`. Those questions will be answered throughout this section and with the data story presented at the conclusion of this document.
@@ -116,17 +116,6 @@ We answer the question: `Does the data is coherent (date with same format, no ou
 The objective is to answer the question: `What is the proportion of animals and how many cats and dogs are they for each outcome?`. Let's visualize how the outcomes are split in the train set with the following histogram.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-ggplot(train, aes(OutcomeType)) +
-        geom_bar(aes(y = ..count.. / sum(..count..))) +
-        scale_y_continuous(labels = percent) +
-        ggtitle("Percentage of animals by outcome") +
-        geom_text(aes(y = ..count.. / sum(..count..), label = scales::percent((..count..) / sum(..count..))), stat = "count", vjust = -0.25) +
-        labs(y = "Percentage of animals", x = "Outcome Types")
-```
-
-This bar chart shows that adoptions and transfers are mostly occuring. Now, we need to know how many cats and dogs are they for each outcome.
-
-```{r echo = FALSE, message = FALSE, warning = FALSE}
 ggplot(train, aes(x = OutcomeType)) +
         geom_bar(aes(y = ..count.. / sum(..count..))) +
         facet_wrap(~AnimalType, ncol = 2) +
@@ -158,8 +147,12 @@ The age of animals should be an important factor on outcomes. People want to ado
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 train.copy$AgeuponOutcome[grep("1 week", train.copy$AgeuponOutcome)] <- "1 week"
 
-train.copy %>% group_by(AgeuponOutcome) %>%
-     ggplot(aes(x = AgeuponOutcome, fill = OutcomeType)) +
+ageuponoutcome <- train.copy %>%
+    select(AgeuponOutcome, AnimalType, OutcomeType) %>%
+    group_by(AgeuponOutcome)
+
+ageuponoutcome %>% 
+    ggplot(aes(x = AgeuponOutcome, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         facet_wrap(~AnimalType, nrow = 2) +
         ggtitle("Age of animals by outcome ordered by number of animals") +
@@ -199,18 +192,84 @@ test$AgeuponOutcome[test.day.list] <- test.age[test.day.list]
 
 train$AgeuponOutcome <- as.integer(train$AgeuponOutcome)
 test$AgeuponOutcome <- as.integer(test$AgeuponOutcome)
+```
 
+Lets see now how the ages are distributed in function of the number of animals and outcomes.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
 train.copy$Age <- train$AgeuponOutcome
-train.copy$Age[train.copy$Age < 365] <- 0
 
-train.copy %>% group_by(Age) %>%
-     ggplot(aes(x = Age, fill = OutcomeType)) +
+ageuponoutcome %>% 
+    filter(grepl("year", AgeuponOutcome)) %>% 
+    mutate(AgeYear = as.integer(gsub(" year[s]?", "", AgeuponOutcome))) %>%
+    ggplot(aes(x = AgeYear, fill = AnimalType)) +
         geom_bar(stat = "count") + 
-        facet_wrap(~AnimalType, nrow = 2) +
-        ggtitle("Age of animals by outcome ordered by number of animals") +
+        facet_wrap(~OutcomeType, nrow = 2) +
+        ggtitle("1 year or older animals by outcome and animal type") +
+        labs(y = "Number of animals", x = "Age of animals") +
+        scale_fill_brewer(palette = "Set1")
+
+ageuponoutcome %>% 
+    filter(grepl("month", AgeuponOutcome))  %>% 
+    mutate(AgeMonth = as.integer(gsub(" month[s]?", "", AgeuponOutcome))) %>%
+    ggplot(aes(x = AgeMonth, fill = AnimalType)) +
+        geom_bar(stat = "count") + 
+        facet_wrap(~OutcomeType, nrow = 2) +
+        ggtitle("Animals between 1 and 11 months old by outcome and animal types") +
+        labs(y = "Number of animals", x = "Age of animals") +
+        scale_fill_brewer(palette = "Set1")
+
+ageuponoutcome %>% 
+    filter(grepl("week", AgeuponOutcome)) %>% 
+    mutate(AgeWeek = as.integer(gsub(" week[s]?", "", AgeuponOutcome))) %>%
+    ggplot(aes(x = AgeWeek, fill = AnimalType)) +
+        geom_bar(stat = "count") + 
+        facet_wrap(~OutcomeType, nrow = 2) +
+        ggtitle("Animals between 1 and 5 weeks old by outcome and animal types") +
+        labs(y = "Number of animals", x = "Age of animals") +
+        scale_fill_brewer(palette = "Set1")
+
+ageuponoutcome %>% 
+    filter(grepl("day", AgeuponOutcome)) %>% 
+    mutate(AgeDay = as.integer(gsub(" day[s]?", "", AgeuponOutcome))) %>%
+    ggplot(aes(x = AgeDay, fill = AnimalType)) +
+        geom_bar(stat = "count") + 
+        facet_wrap(~OutcomeType, nrow = 2) +
+        ggtitle("Animals between 1 and 6 days old by outcome and animal types") +
         labs(y = "Number of animals", x = "Age of animals") +
         scale_fill_brewer(palette = "Set1")
 ```
+
+We can see 3 distinct age groups: days and weeks, months and years. The days and weeks group contains no adoptions and mostly transfers are done. We can state the following hypotheses from this group. 
+
+1. The Animal Center makes the adoption possible only when an animal is 1 month or older.
+2. People do not want to adopt baby animals because they need to learn to their animal to be clean.
+3. Animals get neutered or spayed starting at 1 month old.
+
+The months group representing animals from 1 month to 11 months is clearly showing that 2 months old animals are mostly adopted.
+
+The years group representing animals having 1 year old or more is described by the following density bar chart.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+age.filtered <- ageuponoutcome %>% 
+    filter(grepl("year", AgeuponOutcome) & OutcomeType == "Adoption")  %>% 
+    mutate(AgeYear = as.integer(gsub(" year[s]?", "", AgeuponOutcome))) %>%
+    mutate(Frequency = n()) %>%
+    ungroup() %>% 
+    arrange(AgeYear) %>%
+    distinct(AgeYear)
+
+ggplot(age.filtered, aes(x = AgeYear, fill = AnimalType)) +
+    geom_bar(aes(y = Frequency / sum(Frequency)), stat = "identity") + 
+    ggtitle("1 year or older adopted animals by animal type") +
+    labs(y = "Density", x = "Age of animals") +
+    scale_fill_brewer(palette = "Set1")
+
+cat("Probability Distribution of 1 year old animals or older: ", age.filtered$Frequency / sum(age.filtered$Frequency))
+cat("Poisson Distribution: ", dpois(1:18, lambda = 1.6))
+```
+
+The discrete random variable Age is greater than 0 and ages are independant between each other. This means that age X cannot influance Age Y. Regarding the bar chart, it makes sense that the age approximately follows the Poisson distribution with rate 1.6. But this is true for 1 to 4 years old animals.
 
 
 ## Animal's Name
@@ -219,7 +278,9 @@ The feature `Name` is transformed to a boolean value where the value is 0 when t
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 train.copy$NameLength <- ifelse(train.copy$Name != 0, str_length(train.copy$Name), 0)
 
-train.copy %>% group_by(NameLength) %>%
+train.copy %>% 
+    select(NameLength, OutcomeType, AnimalType) %>%
+    group_by(NameLength) %>%
     ggplot(aes(x = NameLength, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         facet_wrap(~AnimalType, ncol = 2) +
@@ -227,8 +288,16 @@ train.copy %>% group_by(NameLength) %>%
         scale_fill_brewer(palette = "Set1") + 
         labs(y = "Number of animals", x = "Name Length")
 
-train.cats.noname <- filter(train.copy, AnimalType == "Cat" & Name == 0 & OutcomeType == "Transfer")
-train.transfers <- filter(train.copy, OutcomeType == "Transfer")
+train.cats.noname <- train.copy %>%
+    select(AnimalType, Name, OutcomeType) %>%
+    filter(AnimalType == "Cat" & Name == 0 & OutcomeType == "Transfer")
+
+train.transfers <- train.copy %>%
+    select(OutcomeType) %>%
+    filter(OutcomeType == "Transfer")
+
+name.summary <- summary(train.copy$NameLength[train.copy$NameLength > 0])
+print(name.summary)
 ```
 
 From the bar chart, we can see that the name length follow the normal distribution if we exclude length of 0. Animals having no name are mostly transfered but for cats, this is very significant. Transferred cats having no name represent `r nrow(train.cats.noname) / train.n * 100` % of the train set and `r nrow(train.transfers) / train.n * 100` % of all the transferred animals of the train set. This is clearly an insight to consider. Therefore, we transform string values of the `Name` feature in boolean values telling if the animal has a name = 1 or has no name = 0.
@@ -243,7 +312,9 @@ test$Name[test$Name != 0] <- 1
 We want to see if extracting information that check if the animal is sterile or not will have influance on the outcomes. Generally, people who want to adopt a dog or a cat want to know if the animal is sterile or intact. Let's see if this is true with our dataset.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-train.copy %>% group_by(SexuponOutcome) %>%
+train.copy %>% 
+    select(SexuponOutcome, OutcomeType, AnimalType) %>%
+    group_by(SexuponOutcome) %>%
     ggplot(aes(x = SexuponOutcome, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         facet_wrap(~AnimalType, ncol = 2) +
@@ -277,11 +348,17 @@ test$SexuponOutcome <- NULL
 The date and time may have a big influance on the outcomes. We have seen that adoptions represent the most popular outcome of the dataset. Our hypothesis is that people will mostly adopt an animal the weekend.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-train.copy$WeekDay <- weekdays(as.Date(train$DateTime))
+train.copy$Weekday <- weekdays(as.Date(train$DateTime))
+train.copy$Weekday <- factor(train.copy$Weekday, 
+                             levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+#train.copy <- train.copy[order(train.copy$Weekday), ]
+
 train.date <- ymd_hms(train$DateTime)
 
-train.copy %>% group_by(WeekDay) %>%
-    ggplot(aes(x = WeekDay, fill = OutcomeType)) +
+train.copy %>% 
+    select(Weekday, OutcomeType, AnimalType) %>%
+    group_by(Weekday) %>%
+    ggplot(aes(x = Weekday, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         ggtitle("Weekdays by outcome") +
         facet_wrap(~AnimalType, ncol = 2) +
@@ -290,12 +367,14 @@ train.copy %>% group_by(WeekDay) %>%
         theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
-From the bar chart, we can see that animals are mostly adopted the weekend (Saturday and Sunday) which confirm our hypothesis. This makes sense since most of people are working from Monday to Friday. Looking at the website [Austin Animal Center](http://www.austintexas.gov/department/animal-services), animal receiving are only from 11am - 5pm the weekend and 11am - 7pm the other days. From these information, we suppose that extracting the hour from the `DateTime` feature could have influance on the outcomes.
+From the bar chart, we can see that animals are mostly adopted the weekend (Saturday and Sunday) which confirm our hypothesis. This makes sense since most of people are working from Monday to Friday. Looking at the website [Austin Animal Center](http://www.austintexas.gov/department/animal-services), animal adoption claims are from 11am - 7pm every day. From these information, we suppose that extracting the hour from the `DateTime` feature could have influance on the outcomes.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 train.copy$Hour <- hour(train.date)
 
-train.copy %>% group_by(Hour) %>%
+train.copy %>% 
+    select(Hour, OutcomeType, AnimalType) %>%
+    group_by(Hour) %>%
     ggplot(aes(x = Hour, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         ggtitle("Hours by outcome") +
@@ -304,12 +383,17 @@ train.copy %>% group_by(Hour) %>%
         scale_fill_brewer(palette = "Set1")
 ```
 
-From the bar chart, we see that adoptions and returns to owner occur at 5pm and 6pm. Generally, people finish working around 4:30pm - 5pm so this makes sense. There are no outcomes done between 1am and 4am inclusively. There are transfers done at midnight, and at 9am for cats mostly, but most of them are done between 11am and 7pm which correspond to the open hours of the center. Adoptions and transfers done out of open hours may be for exceptional circumstances.
+From the bar chart, we see that adoptions and returns to owner occur at 5pm and 6pm. Generally, people finish working around 4:30pm - 5pm so this makes sense. There are no outcomes done between 1am and 4am inclusively. There are transfers done at midnight, and at 9am for cats mostly, but most of them are done between 11am and 7pm which correspond to the open hours of the center. For adoptions and transfers done out of open hours, it may be the following hypothesis:
+
+1. They are done for exceptional circumstances.
+2. Error when entering the hours in the system.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 train.copy$Minute <- minute(train.date)
 
-train.copy %>% group_by(Minute) %>%
+train.copy %>% 
+    select(Minute, OutcomeType, AnimalType) %>%
+    group_by(Minute) %>%
     ggplot(aes(x = Minute, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         ggtitle("Minutes by outcome") + 
@@ -317,15 +401,17 @@ train.copy %>% group_by(Minute) %>%
         scale_fill_brewer(palette = "Set1") 
 ```
 
-Looking at minutes seems useless since 1 minute is very short and most of us will look at the hour only except if the software records also the minutes and even the seconds. But, from this bar chart, we can see that at 0 minute, there are a lot of transfers done compared to other minutes. From 1 to 59 minutes, the difference is negligible (approximately uniform as expected). This could be explained by an automatic setting if the user does not enter the minutes when recording a new outcome with the software. The software convert empty minutes by "00" as well as the seconds. Since this is recurrent for transfers at 9:00am, it could be the same employee that records these transfers. This is also the case if the user enters only the date. The hours may be set automatically to 00:00:00.
+Looking at minutes seems useless since 1 minute is very short and most of us will look at the hour only except if the software records also the minutes and even the seconds. But, from this bar chart, we can see that at 0 minute, there are a lot of transfers done compared to other minutes. From 1 to 59 minutes, the difference is negligible since it approximately follows a uniform distribution as expected. This could be explained by an automatic setting if the user does not enter the minutes when recording a new outcome with the software. The software convert empty minutes by "00" as well as the seconds. Since this is recurrent for transfers at 9:00am, it could be the same employee that records these transfers. This is also the case if the user enters only the date. The hours may be set automatically to 00:00:00. Therefore, it is possible that some entries concerning hours and minutes are not correct.
 
 Looking at the days, we should see more adoptions the weekend since the majority of people are not working.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-train.copy$Days <- day(train.date)
+train.copy$Day <- day(train.date)
 
-train.copy %>% group_by(Days) %>%
-    ggplot(aes(x = Days, fill = OutcomeType)) +
+train.copy %>% 
+    select(Day, OutcomeType, AnimalType) %>%
+    group_by(Day) %>%
+    ggplot(aes(x = Day, fill = OutcomeType)) +
         geom_bar(stat = "count") +
         facet_wrap(~AnimalType, ncol = 2) +
         ggtitle("Days in months by outcome") +
@@ -338,9 +424,15 @@ There are 4 days (12, 13, 18, 19) where the number of animals and adoptions are 
 We look now at the months to check if some of them can reveal important insights.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
+## Ordering by month names for ggplot.
 train.copy$Month <- months(train.date)
+train.copy$Month <- factor(train.copy$Month, 
+                           levels = format(ISOdate(2004, 1:12, 1),"%B"))
+#train.copy <- train.copy[order(train.copy$Month), ]
 
-train.copy %>% group_by(Month) %>%
+train.copy %>% 
+    select(Month, OutcomeType, AnimalType) %>%
+    group_by(Month) %>%
     ggplot(aes(x = Month, fill = OutcomeType)) +
         geom_bar(stat = "count") +
         facet_wrap(~AnimalType, ncol = 2) +
@@ -355,7 +447,9 @@ From the bar chart, we can see that December and January are months having highe
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 train.copy$Year <- year(train.date)
 
-train.copy %>% group_by(Year) %>%
+train.copy %>% 
+    select(Year, OutcomeType, AnimalType) %>%
+    group_by(Year) %>%
     ggplot(aes(x = Year, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         facet_wrap(~AnimalType, ncol = 2) +
@@ -418,27 +512,30 @@ breed.nomix <- gsub(" Mix", "", train.copy$Breed)
 train.copy$Breed1 <- strsplit(x = breed.nomix, split = "/") %>% sapply(function(x){x[1]})
 
 breeds.common <- train.copy %>% 
+    select(Breed1) %>%
     group_by(Breed1) %>%
     filter(n() >= 100)
 
 train.copy$Breed1[!(train.copy$Breed1 %in% breeds.common$Breed1)] <- "Others"
 
 ## Note that we cannot use 'facet_wrap' because cats don't have the same breeds as the dogs.
-train.copy %>% filter(AnimalType == "Dog") %>% 
+train.copy %>% 
+    filter(AnimalType == "Dog") %>% 
     ggplot(aes(x = Breed1, fill = OutcomeType)) +
-    geom_bar(stat = "count") +
-    ggtitle("Dog breeds by outcome") +
-    scale_fill_brewer(palette = "Set1") +
-    labs(y = "Number of animals", x = "Breeds") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+        geom_bar(stat = "count") +
+        ggtitle("Dog breeds by outcome") +
+        scale_fill_brewer(palette = "Set1") +
+        labs(y = "Number of animals", x = "Breeds") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
-train.copy %>% filter(AnimalType == "Cat") %>% 
+train.copy %>% 
+    filter(AnimalType == "Cat") %>% 
     ggplot(aes(x = Breed1, fill = OutcomeType)) +
-    geom_bar(stat = "count") + 
-    ggtitle("Cat breeds by outcome") +
-    scale_fill_brewer(palette = "Set1") +
-    labs(y = "Number of animals", x = "Breeds") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+        geom_bar(stat = "count") + 
+        ggtitle("Cat breeds by outcome") +
+        scale_fill_brewer(palette = "Set1") +
+        labs(y = "Number of animals", x = "Breeds") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
 For the dogs, Shih Tzu are mostly transferred and less adopted. Pit bulls, Labrador Retreiver and Chihuahua Shorthair are the most common dogs for outcomes. For cats, the domestic shorthair is the most frequent and represent `r nrow(filter(train, grepl("Domestic Shorthair", Breed) & AnimalType == "Cat")) / nrow(filter(train, AnimalType == "Cat")) * 100` % of the cats in the train set.
@@ -457,11 +554,11 @@ print(train.adopted.list)
 
 train.adopted.list %>% 
     ggplot(aes(x = Breed1, y = Percentage)) +
-    geom_bar(stat = "identity") + 
-    ggtitle("Percentage of adopted animal by breed") +
-    scale_y_continuous(labels = percent) +
-    labs(y = "Percentage of animals", x = "Breeds") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+        geom_bar(stat = "identity") + 
+        ggtitle("Percentage of adopted animal by breed") +
+        scale_y_continuous(labels = percent) +
+        labs(y = "Percentage of animals", x = "Breeds") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
 From the bar chart and summary, we see that `r paste0(head(train.adopted.list$Breed1, 3), collapse = ", ")` are breeds with lowest percentage of adoption.
@@ -478,12 +575,12 @@ train.copy$BreedType[train.breed.mix.list] <- "Mix"
 
 train.copy %>% 
     ggplot(aes(x = BreedType, fill = OutcomeType)) +
-    geom_bar(stat = "count") + 
-    ggtitle("Animal breed types by outcome") +
-    facet_wrap(~AnimalType, ncol = 2) +
-    scale_fill_brewer(palette = "Set1") +
-    labs(y = "Number of animals", x = "Breed Types") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+        geom_bar(stat = "count") + 
+        ggtitle("Animal breed types by outcome") +
+        facet_wrap(~AnimalType, ncol = 2) +
+        scale_fill_brewer(palette = "Set1") +
+        labs(y = "Number of animals", x = "Breed Types") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
 We extract this information from the `Breed` feature and add a new feature `BreedType` where all purebred animals are identified with the value 0. The mixed breed are identified with the value 2 and crossed breed with value 1.
@@ -512,9 +609,6 @@ test$CommonBreeds <- GetIntegerFeatureFromGroups(test$Breed, breeds)
 #train$HairType <- GetIntegerFeatureFromGroups(train$Breed, hair.type) - 1
 #test$HairType <- GetIntegerFeatureFromGroups(test$Breed, hair.type) - 1
 
-# train$IsShorthair <- GetBooleanFeatureFromGroup(train$Breed, "Shorthair")
-# test$IsShorthair <- GetBooleanFeatureFromGroup(test$Breed, "Shorthair")
-
 train$Breed <- NULL
 test$Breed <- NULL
 ```
@@ -532,26 +626,29 @@ For each outcome type, we want to know which animal's color has the greatest and
 train.copy$Color1 <- strsplit(x = train.copy$Color, split = "/") %>% sapply(function(x){x[1]})
 
 colors.common <- train.copy %>% 
-                    group_by(Color1) %>%
-                    filter(n() >= 100)
+    select(Color1) %>%
+    group_by(Color1) %>%
+    filter(n() >= 100)
 
 train.copy$Color1[!(train.copy$Color1 %in% colors.common$Color1)] <- "Others"
 
-train.copy %>% filter(AnimalType == "Dog") %>% 
+train.copy %>% 
+    filter(AnimalType == "Dog") %>% 
     ggplot(aes(x = Color1, fill = OutcomeType)) +
-    geom_bar(stat = "count") + 
-    ggtitle("Dog colors by outcome") +
-    scale_fill_brewer(palette = "Set1") +
-    labs(y = "Number of animals", x = "Colors") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+        geom_bar(stat = "count") + 
+        ggtitle("Dog colors by outcome") +
+        scale_fill_brewer(palette = "Set1") +
+        labs(y = "Number of animals", x = "Colors") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
-train.copy %>% filter(AnimalType == "Cat") %>% 
+train.copy %>% 
+    filter(AnimalType == "Cat") %>% 
     ggplot(aes(x = Color1, fill = OutcomeType)) +
-    geom_bar(stat = "count") + 
-    ggtitle("Cat colors by outcome") +
-    scale_fill_brewer(palette = "Set1") +
-    labs(y = "Number of animals", x = "Colors") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+        geom_bar(stat = "count") + 
+        ggtitle("Cat colors by outcome") +
+        scale_fill_brewer(palette = "Set1") +
+        labs(y = "Number of animals", x = "Colors") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
 For the cats, we can see that tan cats are always adopted and tricolor cats are always transferred. Another important insight is that brown cats have not died, are not euthanasied or are not returned to their owner. However, the number of cats for of those colors is not big. Black color is the most popular for cats and dogs following this bar chart.
@@ -561,21 +658,27 @@ Some of colors have a qualifier but these should not have big influance on the o
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 train.copy$ColorQualifier1 <- strsplit(x = train.copy$Color1, split = "\\s") %>% sapply(function(x){ifelse(length(x) > 1, x[2], "None")})
 
-train.copy %>% group_by(ColorQualifier1) %>% filter(AnimalType == "Dog") %>% 
-    ggplot(aes(x = ColorQualifier1, fill = OutcomeType)) +
-    geom_bar(stat = "count") + 
-    ggtitle("Dog color qualifiers by outcome") +
-    scale_fill_brewer(palette = "Set1") +
-    labs(y = "Number of animals", x = "Color Qualifiers") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+color.qualifier <- train.copy %>%
+    select(ColorQualifier1, OutcomeType, AnimalType) %>%
+    group_by(ColorQualifier1)
 
-train.copy %>% group_by(ColorQualifier1) %>% filter(AnimalType == "Cat") %>% 
+color.qualifier %>% 
+    filter(AnimalType == "Dog") %>% 
     ggplot(aes(x = ColorQualifier1, fill = OutcomeType)) +
-    geom_bar(stat = "count") + 
-    ggtitle("Cat color qualifiers by outcome") +
-    scale_fill_brewer(palette = "Set1") +
-    labs(y = "Number of animals", x = "Color Qualifiers") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+        geom_bar(stat = "count") + 
+        ggtitle("Dog color qualifiers by outcome") +
+        scale_fill_brewer(palette = "Set1") +
+        labs(y = "Number of animals", x = "Color Qualifiers") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+color.qualifier %>% 
+    filter(AnimalType == "Cat") %>% 
+    ggplot(aes(x = ColorQualifier1, fill = OutcomeType)) +
+        geom_bar(stat = "count") + 
+        ggtitle("Cat color qualifiers by outcome") +
+        scale_fill_brewer(palette = "Set1") +
+        labs(y = "Number of animals", x = "Color Qualifiers") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
 We can verify with the bar chart above shows that qualifiers has no significant influance on the outcomes for dogs. For cats, tabby is frequent.
@@ -588,11 +691,11 @@ train.copy$NumberOfColors[grep("Tricolor", train.copy$Color)] <- 3
 
 train.copy %>% 
     ggplot(aes(x = NumberOfColors, fill = OutcomeType)) +
-    geom_bar(stat = "count") + 
-    ggtitle("Number of colors for an animal by outcome") +
-    facet_wrap(~AnimalType, ncol = 2) +
-    scale_fill_brewer(palette = "Set1") +
-    labs(y = "Number of animals", x = "Number of colors")
+        geom_bar(stat = "count") + 
+        ggtitle("Number of colors for an animal by outcome") +
+        facet_wrap(~AnimalType, ncol = 2) +
+        scale_fill_brewer(palette = "Set1") +
+        labs(y = "Number of animals", x = "Number of colors")
 
 train$NumberOfColors <- train.copy$NumberOfColors
 
@@ -609,7 +712,7 @@ test$Color <- NULL
 
 
 
-# Training Model
+# Modeling and Interpretation
 In this section, we present what algorithm is used, why are we using it and how it is used. The objective is to build the final submission file containing the probabilities for each outcome type of each animal given in the test set. 
 
 Extreme Gradient Boosting Trees is a good choice to modelize our data. Each tree is a decision tree representing a group of animals where the probabilities of each outcome are approximately the same. For example, first level could be if the animal is sterile, intact or unknown. The second level could be if an animal has a name or not.  
@@ -662,18 +765,18 @@ best <- model.cv[model.cv$test.mlogloss.mean == min(model.cv$test.mlogloss.mean)
 cv.plot.title <- paste("Training log-loss using", cv.nfolds, "folds CV")
 
 print(ggplot(model.cv, aes(x = names)) + 
-      geom_line(aes(y = test.mlogloss.mean, colour = "test")) + 
-      geom_line(aes(y = train.mlogloss.mean, colour = "train")) + 
-      geom_vline(xintercept = best$names, linetype="dotted") +
-      ggtitle(cv.plot.title) + 
-      xlab("Number of trees") + 
-      ylab("log-loss"))
+          geom_line(aes(y = test.mlogloss.mean, colour = "test")) + 
+          geom_line(aes(y = train.mlogloss.mean, colour = "train")) + 
+          geom_vline(xintercept = best$names, linetype="dotted") +
+          ggtitle(cv.plot.title) + 
+          xlab("Number of trees") + 
+          ylab("log-loss"))
      
 print(model.cv)
 cat("\nOptimal testing set Log-Loss score:", best$test.mlogloss.mean)
 cat("\nAssociated training set Log-Loss score:", best$train.mlogloss.mean)
 cat("\nInterval testing set Log-Loss score: [", best$test.mlogloss.mean - best$test.mlogloss.std, ", ", best$test.mlogloss.mean + best$test.mlogloss.std, "].")
-cat("\nDifference between optimal training and testing sets Log-Loss:", best$train.mlogloss.mean - best$test.mlogloss.mean)
+cat("\nDifference between optimal training and testing sets Log-Loss:", abs(best$train.mlogloss.mean - best$test.mlogloss.mean))
 cat("\nOptimal number of trees:", best$names)
 ```
 
@@ -702,6 +805,41 @@ print(importance.matrix)
 
 # Display the features importance.
 print(xgb.plot.importance(importance.matrix))
+```
+
+Lets try with the Random Forest algorithm.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+rf.model <- randomForest(x = train, 
+                         y = as.factor(outcome.type), 
+                         ntree = 100, 
+                         importance = TRUE, 
+                         do.trace = 5)
+
+outcomes <- unique(train.copy$OutcomeType)
+colnames(rf.model$err.rate) <- c("OOB", outcomes)
+plot(rf.model, ylim = c(0, 1))
+legend("topright", colnames(rf.model$err.rate), col = 1:6, cex = 0.8, fill = 1:6)
+
+print(rf.model)
+
+varImpPlot(rf.model)
+
+par(mfrow = c(2, 2))
+for (i in 1:outcome.class.num)
+{
+    # Reduce the x-axis labels font by 0.5. Rotate 90° the x-axis labels.
+    barplot(sort(rf.model$importance[, i], dec = TRUE), 
+            type = "h", 
+            main = outcomes[i], 
+            xlab = "", 
+            ylab = "Gain", 
+            las=2,
+            cex.names=0.7)
+}
+
+rf.prediction.test <- predict(rf.model, test, type = "prob")
+rf.prediction.train <- predict(rf.model, train, type = "prob")
 ```
 
 Note that normally, we would have used a threshold to identify each animal associated to an outcome. Since this is a Kaggle competition, it is not required.
@@ -746,7 +884,7 @@ write.csv(submission, "Submission.csv", row.names = FALSE)
 
 
 
-<!---------------------------------------------------------------CONCLUSION------------------------------------------------------------------------------------>
+<!---------------------------------------------------------------RECOMMANDATIONS--------------------------------------------------------------------------------->
 
 
 
@@ -755,7 +893,9 @@ The objective is to understand trends in animal outcomes. These insights could h
 
 An important insight we found in the dataset is if the animal is sterile, not sterile or unknown. 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-train.copy %>% group_by(SexuponOutcome) %>%
+train.copy %>% 
+    select(SexuponOutcome, OutcomeType, AnimalType) %>%
+    group_by(SexuponOutcome) %>%
     ggplot(aes(x = SexuponOutcome, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         facet_wrap(~AnimalType, ncol = 2) +
@@ -794,12 +934,14 @@ indices <- which(test$Sterility == 2)
 summary(prediction.test$Adoption[indices])
 ```
 
-Since the adoption ratio is by far much better for sterile animals, we recommand to sterilize them when received to the Animal Center. This will greatly increase their chance to be adopted.
+Since the adoption ratio is by far much better for sterile animals, we recommand to sterilize them when received to the Animal Center. This will greatly increase their chance to be adopted. Indeed, regarding the web site, the steps of adoption take much more time if the animal is not sterilized. Poeple have to come to the center again to complete the adoption. 
 
 Regarding the open hours of the Animal Center which is between 11am and 7pm during the work days, we observed that there are more adoptions between 5pm and 7pm. Since people normally finish working between 4h30pm and 5h30pm, this result makes sense.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-train.copy %>% group_by(Hour) %>%
+train.copy %>% 
+    select(Hour, OutcomeType, AnimalType) %>%
+    group_by(Hour) %>%
     ggplot(aes(x = Hour, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
         ggtitle("Number of animals for each hour by outcome") +
@@ -808,24 +950,4 @@ train.copy %>% group_by(Hour) %>%
         scale_fill_brewer(palette = "Set1")
 ```
 
-We can also see that the weekend (Saturday and Sunday), there are more adoptions, specially between 5pm and 7pm as for work days.
-
-```{r echo = FALSE, message = FALSE, warning = FALSE}
-## Get number of adoptions per hours for each weekday.
-train.adopted.list <- train.copy %>% 
-    group_by(Hour, OutcomeType, WeekDay) %>% 
-    summarise(Total = n()) %>% 
-    filter(OutcomeType == "Adoption")
-train.adopted.list <- train.adopted.list[with(train.adopted.list, order(-Total)), ]
-
-print(train.adopted.list)
-
-train.adopted.list %>%
-    ggplot(aes(x = Hour, y = Total)) +
-        geom_bar(stat = "identity") + 
-        facet_wrap(~WeekDay, ncol = 3, nrow = 3) +
-        ggtitle("Number of adopted animals for each hour by Weekday") +
-        labs(y = "Number of animals", x = "Hours")
-```
-
-Therefore, we recommand to keep these open hours and extend them for the weekend as for the work days to allow people coming to the Animal Center.
+We have also seen that the weekend (Saturday and Sunday), there are more adoptions, specially between 5pm and 7pm as for work days. Therefore, we recommand to keep these open hours for adoption claim everyday and extend them for the weekend as for the work days to allow people coming to the Animal Center later. Adding one hours (11am to 8pm) may help.
