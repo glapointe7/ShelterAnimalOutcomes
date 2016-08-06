@@ -3,7 +3,10 @@ title: "Shelter Animal Outcomes"
 author: "Gabriel Lapointe"
 date: "May 13, 2016"
 output:
+  pdf_document:
+    toc: yes
   html_document:
+    highlight: pygments
     number_sections: yes
     toc: yes
 variant: markdown_github
@@ -81,8 +84,14 @@ We first load the test and train datasets, and set the seed. Lets answer the que
 source("Utilities.R")
 
 strings.toNA <- c("", " ", "Unknown", "0 years")
-train <- read.csv("train.csv", header = TRUE, na.strings = strings.toNA, stringsAsFactors = FALSE)
-test <- read.csv("test.csv", header = TRUE, na.strings = strings.toNA, stringsAsFactors = FALSE)
+train <- read.csv("train.csv", 
+                  header = TRUE, 
+                  na.strings = strings.toNA, 
+                  stringsAsFactors = FALSE)
+test <- read.csv("test.csv", 
+                 header = TRUE, 
+                 na.strings = strings.toNA, 
+                 stringsAsFactors = FALSE)
 
 set.seed(1234)
 
@@ -120,7 +129,10 @@ ggplot(train, aes(x = OutcomeType)) +
         geom_bar(aes(y = ..count.. / sum(..count..))) +
         facet_wrap(~AnimalType, ncol = 2) +
         scale_y_continuous(labels = percent) +
-        geom_text(aes(y = ..count.. / sum(..count..) , label = scales::percent(..count.. / sum(..count..))), stat = "count", vjust = -0.25) +
+        geom_text(aes(y = ..count.. / sum(..count..) , 
+                      label = scales::percent(..count.. / sum(..count..))), 
+                  stat = "count", 
+                  vjust = -0.25) +
         ggtitle("Percentage of cats and dogs by outcome") +
         labs(y = "Percentage of animals", x = "Outcome Types") +
         theme(axis.text.x = element_text(angle = 90))
@@ -135,9 +147,7 @@ train.copy <- train
 
 animal.types <- unique(c(train$AnimalType, test$AnimalType))
 train$AnimalType <- GetIntegerFeatureFromGroups(train$AnimalType, animal.types) - 1
-    #as.integer(mapvalues(train$AnimalType, from = animal.types, to = seq(0, length(animal.types) - 1)))
 test$AnimalType <- GetIntegerFeatureFromGroups(test$AnimalType, animal.types) - 1
-    #as.integer(mapvalues(test$AnimalType, from = animal.types, to = seq(0, length(animal.types) - 1)))
 ```
 
 
@@ -167,11 +177,14 @@ We transform the feature `AgeuponOutcome` to integer values. For example, the ag
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
 ## Get the list of integers extracted from the feature AgeuponOutcome.
-train.age <- as.integer(regmatches(train$AgeuponOutcome, regexpr("[[:digit:]]+", train$AgeuponOutcome)))
-test.age <- as.integer(regmatches(test$AgeuponOutcome, regexpr("[[:digit:]]+", test$AgeuponOutcome)))
+train.age <- as.integer(regmatches(train$AgeuponOutcome, 
+                                   regexpr("[[:digit:]]+", train$AgeuponOutcome)))
+test.age <- as.integer(regmatches(test$AgeuponOutcome, 
+                                  regexpr("[[:digit:]]+", test$AgeuponOutcome)))
 
 ## Get row index list where AgeuponOutcome contains "year", "month", "week" or "day".
-## Get the correspondant integer from each row index and apply the formula to get all ages in days.
+## Get the correspondant integer from each row index and 
+## apply the formula to get all ages in days.
 train.year.list <- grep("year", train$AgeuponOutcome)
 train$AgeuponOutcome[train.year.list] <- train.age[train.year.list] * 365
 train.month.list <- grep("month", train$AgeuponOutcome)
@@ -251,6 +264,13 @@ The months group representing animals from 1 month to 11 months is clearly showi
 The years group representing animals having 1 year old or more is described by the following density bar chart.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
+# SELECT AgeuponOutcome, OutcomeType, AnimalType, COUNT(AgeuponOutcome) AS Frequency, 
+#        CAST(SUBSTRING(AgeuponOutcome, 1, PATINDEX(' year[s]?', AgeuponOutcome)) AS INT) AS AgeYear
+# FROM Animal
+# WHERE OutcomeType = 'Adoption' 
+# GROUP BY AgeuponOutcome
+# HAVING AgeuponOutcome LIKE '%year%'
+
 age.filtered <- ageuponoutcome %>% 
     filter(grepl("year", AgeuponOutcome) & OutcomeType == "Adoption")  %>% 
     mutate(AgeYear = as.integer(gsub(" year[s]?", "", AgeuponOutcome))) %>%
@@ -259,17 +279,40 @@ age.filtered <- ageuponoutcome %>%
     arrange(AgeYear) %>%
     distinct(AgeYear)
 
-ggplot(age.filtered, aes(x = AgeYear, fill = AnimalType)) +
-    geom_bar(aes(y = Frequency / sum(Frequency)), stat = "identity") + 
-    ggtitle("1 year or older adopted animals by animal type") +
-    labs(y = "Density", x = "Age of animals") +
-    scale_fill_brewer(palette = "Set1")
+# If there are no animals for particular ages, we set the density to 0.
+age.sequence <- seq(min(age.filtered$AgeYear), max(age.filtered$AgeYear), by = 1)
+age.notfound <- age.sequence[!age.sequence %in% age.filtered$AgeYear]
+newyear <- data.frame(AgeuponOutcome = paste(age.notfound, "years"), 
+                      AnimalType = "Dog", 
+                      OutcomeType = "Adoption", 
+                      AgeYear = age.notfound, 
+                      Frequency = 0)
+age.filtered <- bind_rows(age.filtered, newyear) %>%
+    arrange(AgeYear)
 
-cat("Probability Distribution of 1 year old animals or older: ", age.filtered$Frequency / sum(age.filtered$Frequency))
-cat("Poisson Distribution: ", dpois(1:18, lambda = 1.6))
+age.filtered %>%
+    ggplot(aes(x = AgeYear)) +
+        geom_bar(aes(y = Frequency / sum(Frequency)), stat = "identity") + 
+        ggtitle("1 year or older adopted animals by animal type") +
+        labs(y = "Density", x = "Age of animals") +
+        scale_x_continuous(breaks = seq(min(age.filtered$AgeYear), max(age.filtered$AgeYear), by = 1)) +
+        scale_fill_brewer(palette = "Set1")
+
+age.density <- data.frame(year_density = age.filtered$Frequency / sum(age.filtered$Frequency),
+                          poisson_density = dpois(1:18, lambda = 1.6))
+
+print(age.density)
+
+plot(age.density$year_density, 
+     type = "l", 
+     main = "Age and Poisson densities comparaison.", 
+     xlab = "Age", 
+     ylab = "Density")
+lines(age.density$poisson_density, col = 2)
+legend("topright", c("Age Density", "Poisson Density"), col = 1:2, cex = 0.8, fill = 1:2)
 ```
 
-The discrete random variable Age is greater than 0 and ages are independant between each other. This means that age X cannot influance Age Y. Regarding the bar chart, it makes sense that the age approximately follows the Poisson distribution with rate 1.6. But this is true for 1 to 4 years old animals.
+The discrete random variable Age is greater than 0 and ages are independant between each other. This means that age X cannot influance Age Y. Regarding the bar chart, it makes sense that the age approximately follows the Poisson distribution with lambda (mean) 1.6. 
 
 
 ## Animal's Name
@@ -285,6 +328,7 @@ train.copy %>%
         geom_bar(stat = "count") + 
         facet_wrap(~AnimalType, ncol = 2) +
         ggtitle("Name length of animals by Outcome") +
+        scale_x_continuous(breaks = seq(min(train.copy$NameLength), max(train.copy$NameLength), by = 1)) +
         scale_fill_brewer(palette = "Set1") + 
         labs(y = "Number of animals", x = "Name Length")
 
@@ -300,7 +344,42 @@ name.summary <- summary(train.copy$NameLength[train.copy$NameLength > 0])
 print(name.summary)
 ```
 
-From the bar chart, we can see that the name length follow the normal distribution if we exclude length of 0. Animals having no name are mostly transfered but for cats, this is very significant. Transferred cats having no name represent `r nrow(train.cats.noname) / train.n * 100` % of the train set and `r nrow(train.transfers) / train.n * 100` % of all the transferred animals of the train set. This is clearly an insight to consider. Therefore, we transform string values of the `Name` feature in boolean values telling if the animal has a name = 1 or has no name = 0.
+From the bar chart, we can see that the name length follow the normal distribution if we exclude length of 0. In this context, animals having no name is possible, so it is not considered as an anomaly.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+name.length <- train.copy %>% 
+    select(NameLength, AnimalType) %>%
+    group_by(NameLength) %>% 
+    filter(NameLength > 0)  %>% 
+    mutate(Frequency = n()) %>%
+    ungroup() %>% 
+    arrange(NameLength) %>%
+    distinct(NameLength)
+
+name.length %>%
+    ggplot(aes(x = NameLength)) +
+        geom_bar(aes(y = Frequency / sum(Frequency)), stat = "identity") + 
+        scale_x_continuous(breaks = seq(min(name.length$NameLength), max(name.length$NameLength), by = 1)) +
+        ggtitle("Density of the name length of animals") +
+        labs(y = "Density", x = "Name length") +
+        scale_fill_brewer(palette = "Set1")
+
+names.length.density <- data.frame(length_density = name.length$Frequency / sum(name.length$Frequency), 
+                           normal_density = dnorm(1:12, mean = 5, sd = 1.35))
+print(names.length.density)
+
+plot(names.length.density$length_density, 
+     type = "l", 
+     main = "Name length and Normal density comparaison.", 
+     xlab = "Name length", 
+     ylab = "Density")
+lines(names.length.density$normal_density, col = 2)
+legend("topright", c("Name length Distribution", "Normal Distribution"), col = 1:2, cex = 0.8, fill = 1:2)
+```
+
+The density of the name length distribution is approximated by the Normal distribution. Mathematically, we define the random variable $L$ as the name length of an animal such that $L \sim N(5, 1.35^2)$.
+
+Animals having no name are mostly transfered but for cats, this is very significant. Transferred cats having no name represent `r nrow(train.cats.noname) / train.n * 100` % of the train set and `r nrow(train.transfers) / train.n * 100` % of all the transferred animals of the train set. This is clearly an insight to consider. Therefore, we transform string values of the `Name` feature in boolean values telling if the animal has a name = 1 or has no name = 0.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
 train$Name[train$Name != 0] <- 1
@@ -314,6 +393,7 @@ We want to see if extracting information that check if the animal is sterile or 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 train.copy %>% 
     select(SexuponOutcome, OutcomeType, AnimalType) %>%
+    mutate(SexuponOutcome = ifelse(SexuponOutcome == 0, "Unknown", SexuponOutcome)) %>%
     group_by(SexuponOutcome) %>%
     ggplot(aes(x = SexuponOutcome, fill = OutcomeType)) +
         geom_bar(stat = "count") + 
@@ -416,10 +496,11 @@ train.copy %>%
         facet_wrap(~AnimalType, ncol = 2) +
         ggtitle("Days in months by outcome") +
         labs(y = "Number of animals", x = "Days in months") +
+        scale_x_continuous(breaks = seq(min(train.copy$Day), max(train.copy$Day), by = 5)) +
         scale_fill_brewer(palette = "Set1")
 ```
 
-There are 4 days (12, 13, 18, 19) where the number of animals and adoptions are higher than the other days for cats. Also, note that there are less animals on the day 31. Indeed, since there are only 7 months over 12 having 31 days, this result makes sense.
+There are 4 days (12, 13, 18, 19) where the number of adopted cats are higher than the other days. Also, note that there are less animals on the day 31. Indeed, since there are only 7 months over 12 having 31 days, this result makes sense.
 
 We look now at the months to check if some of them can reveal important insights.
 
@@ -484,14 +565,18 @@ train$Year <- year(train.date)
 train$Month <- month(train.date)
 train$Day <- day(train.date)
 train$Hour <- hour(train.date)
-train$DateInDays <- difftime(as.Date(train.date,'%Y/%m/%d'), as.Date(min(train.date),'%Y/%m/%d'), units = c("days"))
+train$DateInDays <- difftime(as.Date(train.date,'%Y/%m/%d'), 
+                             as.Date(min(train.date),'%Y/%m/%d'), 
+                             units = c("days"))
 train$Time <- hour(train.date) * 60 + minute(train.date)
 
 test$Year <- year(test.date)
 test$Month <- month(test.date)
 test$Day <- day(test.date)
 test$Hour <- hour(test.date)
-test$DateInDays <- difftime(as.Date(test.date,'%Y/%m/%d'), as.Date(min(test.date),'%Y/%m/%d'), units = c("days"))
+test$DateInDays <- difftime(as.Date(test.date,'%Y/%m/%d'), 
+                            as.Date(min(test.date),'%Y/%m/%d'), 
+                            units = c("days"))
 test$Time <- hour(test.date) * 60 + minute(test.date)
 
 train$DateTime <- NULL
@@ -538,7 +623,7 @@ train.copy %>%
         theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
-For the dogs, Shih Tzu are mostly transferred and less adopted. Pit bulls, Labrador Retreiver and Chihuahua Shorthair are the most common dogs for outcomes. For cats, the domestic shorthair is the most frequent and represent `r nrow(filter(train, grepl("Domestic Shorthair", Breed) & AnimalType == "Cat")) / nrow(filter(train, AnimalType == "Cat")) * 100` % of the cats in the train set.
+For the dogs, Shih Tzu are mostly transferred and less adopted. Pit bulls, Labrador Retreiver and Chihuahua Shorthair are the most common dogs for outcomes. For cats, the domestic shorthair is the most frequent and represent `r nrow(filter(train.copy, grepl("Domestic Shorthair", Breed) & AnimalType == "Cat")) / nrow(filter(train.copy, AnimalType == "Cat")) * 100` % of the cats in the train set.
 
 Lets summarize the number of adopted animals and their percentage grouped by the breed. In this way, we will see which animals have the lowest ratio for adoption.
 
@@ -604,11 +689,6 @@ breeds <- c("Pit Bull", "Shih Tzu", "Pug")
 train$CommonBreeds <- GetIntegerFeatureFromGroups(train$Breed, breeds)
 test$CommonBreeds <- GetIntegerFeatureFromGroups(test$Breed, breeds)
 
-## New feature 'HairType' where Shorthair = 0, Longhair = 1, Wirehair = 2, Medium Hair = 3
-#hair.type <- c("Shorthair", "Longhair", "Wirehair", "Medium Hair")
-#train$HairType <- GetIntegerFeatureFromGroups(train$Breed, hair.type) - 1
-#test$HairType <- GetIntegerFeatureFromGroups(test$Breed, hair.type) - 1
-
 train$Breed <- NULL
 test$Breed <- NULL
 ```
@@ -656,7 +736,8 @@ For the cats, we can see that tan cats are always adopted and tricolor cats are 
 Some of colors have a qualifier but these should not have big influance on the outcomes. We take the feature `Color1` to determine the qualifiers and see what happens.
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-train.copy$ColorQualifier1 <- strsplit(x = train.copy$Color1, split = "\\s") %>% sapply(function(x){ifelse(length(x) > 1, x[2], "None")})
+train.copy$ColorQualifier1 <- strsplit(x = train.copy$Color1, split = "\\s") %>% 
+    sapply(function(x){ifelse(length(x) > 1, x[2], "None")})
 
 color.qualifier <- train.copy %>%
     select(ColorQualifier1, OutcomeType, AnimalType) %>%
@@ -708,7 +789,7 @@ test$Color <- NULL
 
 
 
-<!----------------------------------------------------------------------TRAINING MODEL--------------------------------------------------------------------------->
+<!----------------------------------------------------------------------TRAINING MODEL------------------------------------------------------------------------->
 
 
 
@@ -724,26 +805,25 @@ We prepare the parameters and matrices for the cross-validation and final predic
 We use the `subsample` parameter which is the subsample ratio of the training instances. The parameter `eta` control the learning rate since the XGBoost uses the gradient descent which needs a learning rate parameter.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-outcomes.string <- sort(unique(train$OutcomeType))
+outcomes <- unique(train$OutcomeType)
 outcome.type <- CategoryToInteger(train$OutcomeType) - 1
-indices <- order(unique(train$OutcomeType))
 
 train$OutcomeSubtype <- NULL
 train$OutcomeType <- NULL
 
-outcome.class.num <- length(outcomes.string)
+outcome.class.num <- length(outcomes)
 param <- list(objective        = "multi:softprob",
               num_class        = outcome.class.num,    
-              eta              = 0.12,      # Control the learning rate
+              eta              = 0.12,  # Control the learning rate
               subsample        = 0.8,
-              max_depth        = 8,        # Maximum depth of the tree
-              colsample_bytree = 0.9,     # Subsample ratio of columns when constructing each tree
+              max_depth        = 8,
+              colsample_bytree = 0.9, 
               eval_metric      = "mlogloss")
 ```
 
 
 ## Cross-Validation
-We proceed to a 10-fold cross-validation to get the optimal number of trees and multi-class log-loss score. We use randomly subsamples representing 75% of the training set. Since we don't have too many observations (animals) and features, we can use 10 folds instead of 5 folds. Thus, the training set will be split in 10 test samples where each test sample has `r train.n / 10` observations.
+We proceed to a 10-fold cross-validation to get the optimal number of trees and multi-class log-loss score. We use randomly subsamples representing 80% of the training set. Since we don't have too many observations (animals) and features, we can use 10 folds instead of 5 folds. Thus, the training set will be split in 10 test samples where each test sample has `r train.n / 10` observations.
 
 For each tree, we will have the average of 10 error estimates to obtain a more robust estimate of the true prediction error. This is done for all trees and we get the optimal number of trees to use for the test set.
 
@@ -816,7 +896,6 @@ rf.model <- randomForest(x = train,
                          importance = TRUE, 
                          do.trace = 5)
 
-outcomes <- unique(train.copy$OutcomeType)
 colnames(rf.model$err.rate) <- c("OOB", outcomes)
 plot(rf.model, ylim = c(0, 1))
 legend("topright", colnames(rf.model$err.rate), col = 1:6, cex = 0.8, fill = 1:6)
@@ -852,18 +931,18 @@ We can verify how our predictions score under the multi-class log-loss function.
 prediction.train.matrix <- matrix(prediction.train, ncol = outcome.class.num, byrow = TRUE)
 
 rows <- nrow(train)
-outcomes <- matrix(0, nrow = rows, ncol = outcome.class.num)
+outcomes.train <- matrix(0, nrow = rows, ncol = outcome.class.num)
 for(i in 1:rows)
 {
-    outcomes[i ,outcome.type[i] + 1] <- 1
+    outcomes.train[i ,outcome.type[i] + 1] <- 1
 }
 
-multiclass.logloss <- MultiLogLoss(prediction.train.matrix, outcomes)
+multiclass.logloss <- MultiLogLoss(prediction.train.matrix, outcomes.train)
 print(multiclass.logloss)
 
 ## Confusion matrix
 predicted.train <- data.frame(prediction.train.matrix)
-colnames(predicted.train) <- unique(train.copy$OutcomeType)
+colnames(predicted.train) <- outcomes
 predicted <- predicted.train / rowSums(predicted.train)
 predicted$Class <- apply(predicted.train, 1, function(x) names(predicted.train)[which.max(x)])
 
@@ -875,8 +954,10 @@ confusionMatrix(predicted$Class, train.copy$OutcomeType)
 We write the `ID` and the predicted outcome classes in the submission file.
 
 ```{r echo = TRUE, message = FALSE, warning = FALSE}
-prediction.test <- data.frame(matrix(prediction.test, ncol = outcome.class.num, byrow = TRUE))[, indices]
-colnames(prediction.test) <- outcomes.string
+prediction.test <- data.frame(matrix(prediction.test, 
+                                     ncol = outcome.class.num, 
+                                     byrow = TRUE))[, order(outcomes)]
+colnames(prediction.test) <- sort(outcomes)
 
 submission <- cbind(data.frame(ID = test.id), prediction.test)
 write.csv(submission, "Submission.csv", row.names = FALSE)
@@ -884,7 +965,7 @@ write.csv(submission, "Submission.csv", row.names = FALSE)
 
 
 
-<!---------------------------------------------------------------RECOMMANDATIONS--------------------------------------------------------------------------------->
+<!---------------------------------------------------------------RECOMMANDATIONS------------------------------------------------------------------------------->
 
 
 

@@ -197,7 +197,9 @@ The years group representing animals having 1 year old or more is described by t
 ## Poisson Distribution:  0.3230344 0.2584275 0.137828 0.05513121 0.01764199 0.00470453 0.001075321 0.0002150642 0.00003823364 0.000006117382 0.0000008898011 0.0000001186401 0.00000001460186 0.000000001668784 0.0000000001780037 0.00000000001780037 0.000000000001675329 0.0000000000001489181
 ```
 
-The discrete random variable Age is greater than 0 and ages are independant between each other. This means that age X cannot influance Age Y. Regarding the bar chart, it makes sense that the age approximately follows the Poisson distribution with rate 1.6. But this is true for 1 to 4 years old animals.
+![plot of chunk unnamed-chunk-7](figure/unnamed-chunk-7-2.png)
+
+The discrete random variable Age is greater than 0 and ages are independant between each other. This means that age X cannot influance Age Y. Regarding the bar chart, it makes sense that the age approximately follows the Poisson distribution with lambda (mean) 1.6. 
 
 
 ## Animal's Name
@@ -210,7 +212,35 @@ The feature `Name` is transformed to a boolean value where the value is 0 when t
 ##   1.000   4.000   5.000   5.585   6.000  12.000
 ```
 
-From the bar chart, we can see that the name length follow the normal distribution if we exclude length of 0. Animals having no name are mostly transfered but for cats, this is very significant. Transferred cats having no name represent 13.7790415 % of the train set and 35.2501029 % of all the transferred animals of the train set. This is clearly an insight to consider. Therefore, we transform string values of the `Name` feature in boolean values telling if the animal has a name = 1 or has no name = 0.
+From the bar chart, we can see that the name length follow the normal distribution if we exclude length of 0. In this context, animals having no name is possible, so it is not considered as an anomaly.
+
+![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9-1.png)
+
+```
+## Error in name.summary$mean: $ operator is invalid for atomic vectors
+```
+
+```
+## Error in cat("Probability Distribution of name length of dogs: ", animal.names$frequency): object 'animal.names' not found
+```
+
+```
+## Error in cat("Normal Distribution: ", animal.names$normal): object 'animal.names' not found
+```
+
+```
+## Error in plot(animal.names$frequency, type = "l", main = "Name length and Normal distributions comparaison.", : object 'animal.names' not found
+```
+
+```
+## Error in lines(animal.names$normal, col = 2): object 'animal.names' not found
+```
+
+```
+## Error in strwidth(legend, units = "user", cex = cex, font = text.font): plot.new has not been called yet
+```
+
+Animals having no name are mostly transfered but for cats, this is very significant. Transferred cats having no name represent 13.7790415 % of the train set and 35.2501029 % of all the transferred animals of the train set. This is clearly an insight to consider. Therefore, we transform string values of the `Name` feature in boolean values telling if the animal has a name = 1 or has no name = 0.
 
 
 ```r
@@ -222,7 +252,7 @@ test$Name[test$Name != 0] <- 1
 ## Animal's Sterility and Sex
 We want to see if extracting information that check if the animal is sterile or not will have influance on the outcomes. Generally, people who want to adopt a dog or a cat want to know if the animal is sterile or intact. Let's see if this is true with our dataset.
 
-![plot of chunk unnamed-chunk-10](figure/unnamed-chunk-10-1.png)
+![plot of chunk unnamed-chunk-11](figure/unnamed-chunk-11-1.png)
 
 We can see that sterile animals are mostly adopted which confirms our hypothesis. Unknown or intact animals are mostly transferred. This makes sense with unknown ones since they may need to be transferred to the clinic to identify clearly their sex and if they are sterile or not. Note that animals that we do not have information on their sterility and sex are not adopted. Thus, knowing if the animal is sterile or not has influance on the outcomes.
 
@@ -248,34 +278,34 @@ test$SexuponOutcome <- NULL
 ## Date & Time
 The date and time may have a big influance on the outcomes. We have seen that adoptions represent the most popular outcome of the dataset. Our hypothesis is that people will mostly adopt an animal the weekend.
 
-![plot of chunk unnamed-chunk-12](figure/unnamed-chunk-12-1.png)
+![plot of chunk unnamed-chunk-13](figure/unnamed-chunk-13-1.png)
 
 From the bar chart, we can see that animals are mostly adopted the weekend (Saturday and Sunday) which confirm our hypothesis. This makes sense since most of people are working from Monday to Friday. Looking at the website [Austin Animal Center](http://www.austintexas.gov/department/animal-services), animal adoption claims are from 11am - 7pm every day. From these information, we suppose that extracting the hour from the `DateTime` feature could have influance on the outcomes.
 
-![plot of chunk unnamed-chunk-13](figure/unnamed-chunk-13-1.png)
+![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png)
 
 From the bar chart, we see that adoptions and returns to owner occur at 5pm and 6pm. Generally, people finish working around 4:30pm - 5pm so this makes sense. There are no outcomes done between 1am and 4am inclusively. There are transfers done at midnight, and at 9am for cats mostly, but most of them are done between 11am and 7pm which correspond to the open hours of the center. For adoptions and transfers done out of open hours, it may be the following hypothesis:
 
 1. They are done for exceptional circumstances.
 2. Error when entering the hours in the system.
 
-![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png)
+![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png)
 
 Looking at minutes seems useless since 1 minute is very short and most of us will look at the hour only except if the software records also the minutes and even the seconds. But, from this bar chart, we can see that at 0 minute, there are a lot of transfers done compared to other minutes. From 1 to 59 minutes, the difference is negligible since it approximately follows a uniform distribution as expected. This could be explained by an automatic setting if the user does not enter the minutes when recording a new outcome with the software. The software convert empty minutes by "00" as well as the seconds. Since this is recurrent for transfers at 9:00am, it could be the same employee that records these transfers. This is also the case if the user enters only the date. The hours may be set automatically to 00:00:00. Therefore, it is possible that some entries concerning hours and minutes are not correct.
 
 Looking at the days, we should see more adoptions the weekend since the majority of people are not working.
 
-![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png)
+![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
 
 There are 4 days (12, 13, 18, 19) where the number of animals and adoptions are higher than the other days for cats. Also, note that there are less animals on the day 31. Indeed, since there are only 7 months over 12 having 31 days, this result makes sense.
 
 We look now at the months to check if some of them can reveal important insights.
 
-![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
+![plot of chunk unnamed-chunk-17](figure/unnamed-chunk-17-1.png)
 
 From the bar chart, we can see that December and January are months having highest number of adoptions of dogs. for the cats, July and December represent the highest number of adoptions. This can be explained by holidays like Christmas and the New Year's day. One possible hypothesis is that children want a dog or a cat for Christmas so they ask their parents to adopt an animal and give them as a Christmas gift.
 
-![plot of chunk unnamed-chunk-17](figure/unnamed-chunk-17-1.png)
+![plot of chunk unnamed-chunk-18](figure/unnamed-chunk-18-1.png)
 
 Years 2013 and 2016 have less outcomes than 2014 and 2015 since the dataset dates start on 2013-10-01 09:31:00 and end on 2016-02-21 19:17:00.
 
@@ -322,7 +352,7 @@ test$DateTime <- NULL
 ## Animal's Breed
 Since we have many breeds, we will create a breed class named 'Other' where breeds having less than 100 animals will be in this class. The breed should be important since people do not want to adopt an agressive animal for example. 
 
-![plot of chunk unnamed-chunk-19](figure/unnamed-chunk-19-1.png)![plot of chunk unnamed-chunk-19](figure/unnamed-chunk-19-2.png)
+![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-1.png)![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-2.png)
 
 For the dogs, Shih Tzu are mostly transferred and less adopted. Pit bulls, Labrador Retreiver and Chihuahua Shorthair are the most common dogs for outcomes. For cats, the domestic shorthair is the most frequent and represent NaN % of the cats in the train set.
 
@@ -348,13 +378,13 @@ Lets summarize the number of adopted animals and their percentage grouped by the
 ## ..                ...         ...   ...        ...
 ```
 
-![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-1.png)
+![plot of chunk unnamed-chunk-21](figure/unnamed-chunk-21-1.png)
 
 From the bar chart and summary, we see that Shih Tzu, Pug, Pit Bull are breeds with lowest percentage of adoption.
 
 We also check if the breed types (Mix, Cross or Pure) have a significant impact on the outcomes.
 
-![plot of chunk unnamed-chunk-21](figure/unnamed-chunk-21-1.png)
+![plot of chunk unnamed-chunk-22](figure/unnamed-chunk-22-1.png)
 
 We extract this information from the `Breed` feature and add a new feature `BreedType` where all purebred animals are identified with the value 0. The mixed breed are identified with the value 2 and crossed breed with value 1.
 
@@ -392,19 +422,19 @@ test$Breed <- NULL
 ## Animal's Color
 For each outcome type, we want to know which animal's color has the greatest and lowest count. For colors having less than 100 animals, we categorize them as `Others` meaning that these colors are not common.
 
-![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-1.png)![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-2.png)
+![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-1.png)![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-2.png)
 
 For the cats, we can see that tan cats are always adopted and tricolor cats are always transferred. Another important insight is that brown cats have not died, are not euthanasied or are not returned to their owner. However, the number of cats for of those colors is not big. Black color is the most popular for cats and dogs following this bar chart.
 
 Some of colors have a qualifier but these should not have big influance on the outcomes. We take the feature `Color1` to determine the qualifiers and see what happens.
 
-![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-1.png)![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-2.png)
+![plot of chunk unnamed-chunk-26](figure/unnamed-chunk-26-1.png)![plot of chunk unnamed-chunk-26](figure/unnamed-chunk-26-2.png)
 
 We can verify with the bar chart above shows that qualifiers has no significant influance on the outcomes for dogs. For cats, tabby is frequent.
 
 With the color feature, we can extract the number of colors. If we find a slash `/` character which we define as a `separator`, then we have 2 colors. If we find `Tricolor`, then this means that we have 3 colors. 
 
-![plot of chunk unnamed-chunk-26](figure/unnamed-chunk-26-1.png)
+![plot of chunk unnamed-chunk-27](figure/unnamed-chunk-27-1.png)
 
 
 
@@ -450,7 +480,7 @@ For each tree, we will have the average of 10 error estimates to obtain a more r
 
 We also display 2 curves indicating the test and train multi-Logloss mean progression. The vertical dotted line is the optimal number of trees. This plot shows if the model overfit or underfit.
 
-![plot of chunk unnamed-chunk-28](figure/unnamed-chunk-28-1.png)
+![plot of chunk unnamed-chunk-29](figure/unnamed-chunk-29-1.png)
 
 ```
 ##      train.mlogloss.mean train.mlogloss.std test.mlogloss.mean
@@ -527,7 +557,7 @@ We proceed to the predictions of the test set and show the features importance.
 ## 14:           Year 0.003372156 0.002410288 0.009067458
 ```
 
-![plot of chunk unnamed-chunk-29](figure/unnamed-chunk-29-1.png)
+![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-1.png)
 
 Lets try with the Random Forest algorithm.
 
@@ -556,7 +586,7 @@ Lets try with the Random Forest algorithm.
 ##   100:  29.34% 53.74% 73.12% 16.53% 23.07% 90.36%
 ```
 
-![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-1.png)
+![plot of chunk unnamed-chunk-31](figure/unnamed-chunk-31-1.png)
 
 ```
 ## 
@@ -576,7 +606,7 @@ Lets try with the Random Forest algorithm.
 ## 4   11  24   21  122 19   0.9035533
 ```
 
-![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-2.png)![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-3.png)![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-4.png)
+![plot of chunk unnamed-chunk-31](figure/unnamed-chunk-31-2.png)![plot of chunk unnamed-chunk-31](figure/unnamed-chunk-31-3.png)![plot of chunk unnamed-chunk-31](figure/unnamed-chunk-31-4.png)
 
 Note that normally, we would have used a threshold to identify each animal associated to an outcome. Since this is a Kaggle competition, it is not required.
 
@@ -655,7 +685,7 @@ write.csv(submission, "Submission.csv", row.names = FALSE)
 The objective is to understand trends in animal outcomes. These insights could help shelters focus their energy on specific animals who need a little extra help finding a new home. Therefore, we need insights to help increasing the number of animals adopted.
 
 An important insight we found in the dataset is if the animal is sterile, not sterile or unknown. 
-![plot of chunk unnamed-chunk-33](figure/unnamed-chunk-33-1.png)
+![plot of chunk unnamed-chunk-34](figure/unnamed-chunk-34-1.png)
 
 The bar chart shows that animals with no information about its sterility are never adopted. They represent 4.0929328 % of the dataset where we already know the outcomes. Our predictions go the same way where the probabilities are very low as the following summary shows the results.
 
@@ -685,6 +715,6 @@ Since the adoption ratio is by far much better for sterile animals, we recommand
 
 Regarding the open hours of the Animal Center which is between 11am and 7pm during the work days, we observed that there are more adoptions between 5pm and 7pm. Since people normally finish working between 4h30pm and 5h30pm, this result makes sense.
 
-![plot of chunk unnamed-chunk-37](figure/unnamed-chunk-37-1.png)
+![plot of chunk unnamed-chunk-38](figure/unnamed-chunk-38-1.png)
 
 We have also seen that the weekend (Saturday and Sunday), there are more adoptions, specially between 5pm and 7pm as for work days. Therefore, we recommand to keep these open hours for adoption claim everyday and extend them for the weekend as for the work days to allow people coming to the Animal Center later. Adding one hours (11am to 8pm) may help.
